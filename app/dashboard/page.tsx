@@ -28,10 +28,31 @@ export default function DashboardOverviewPage() {
   const [copied, setCopied] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
 
-  if (isLoading || !restaurant) {
+  if (isLoading) {
     return (
-      <div className="py-12 text-center text-zinc-400 text-sm">
-        Loading dashboard...
+      <div className="py-24 flex flex-col items-center justify-center">
+        <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-xs font-semibold text-zinc-400">Loading your dashboard...</p>
+      </div>
+    );
+  }
+
+  if (!restaurant) {
+    return (
+      <div className="bg-white dark:bg-zinc-900 rounded-3xl p-8 sm:p-12 border border-zinc-200 dark:border-zinc-800 text-center max-w-lg mx-auto shadow-sm my-12 animate-fade-in-up">
+        <div className="w-16 h-16 rounded-3xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center mx-auto mb-4 shadow-inner">
+          <UtensilsCrossed className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-black text-zinc-900 dark:text-zinc-100">Welcome to MenuMint!</h2>
+        <p className="text-xs text-zinc-500 mt-2 mb-6 max-w-sm mx-auto leading-relaxed">
+          Your account is active, but you haven&apos;t set up your restaurant profile and menu yet. It only takes 2 minutes!
+        </p>
+        <Link href="/onboarding">
+          <Button variant="primary" size="lg" className="w-full shadow-md font-bold">
+            <Sparkles className="w-4 h-4 mr-2" />
+            Set Up My Restaurant (2 mins)
+          </Button>
+        </Link>
       </div>
     );
   }

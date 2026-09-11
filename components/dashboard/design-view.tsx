@@ -17,7 +17,17 @@ export function DesignView() {
   const [secondaryColor, setSecondaryColor] = useState(restaurant?.secondary_color || "#047857");
   const [mobileTab, setMobileTab] = useState<"design" | "preview">("design");
 
-  if (!restaurant) return null;
+  if (!restaurant) {
+    return (
+      <div className="py-20 text-center max-w-md mx-auto bg-white dark:bg-zinc-900 rounded-3xl p-8 border border-zinc-200 dark:border-zinc-800 shadow-sm my-8">
+        <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">No Restaurant Configured</h2>
+        <p className="text-xs text-zinc-500 mt-1 mb-5">Please set up your restaurant first to choose a design theme.</p>
+        <a href="/onboarding" className="inline-flex items-center px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 text-white">
+          Set Up Restaurant
+        </a>
+      </div>
+    );
+  }
 
   const handleSelectTemplate = async (key: TemplateKey) => {
     await setTemplate(key);

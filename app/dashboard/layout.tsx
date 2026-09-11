@@ -32,11 +32,16 @@ export default function DashboardLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // If user is not logged in after loading, redirect to login
+  // If user has no restaurant yet, guide them to onboarding wizard
   React.useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/login");
+    if (!isLoading) {
+      if (!user) {
+        router.push("/login");
+      } else if (!restaurant && pathname !== "/dashboard/account" && pathname !== "/onboarding") {
+        router.push("/onboarding");
+      }
     }
-  }, [user, isLoading, router]);
+  }, [user, restaurant, isLoading, router, pathname]);
 
   const navItems = [
     { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
