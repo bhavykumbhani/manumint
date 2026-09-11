@@ -47,6 +47,110 @@ const STORAGE_KEY_PREFIX = "menumint_v1";
 
 const MenuStoreContext = createContext<MenuStoreContextType | undefined>(undefined);
 
+function createStarterRestaurantForUser(user: Profile): {
+  restaurant: Restaurant;
+  categories: Category[];
+  items: MenuItem[];
+} {
+  const displayName = user.full_name || user.email.split("@")[0] || "My";
+  const capitalizedName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+  const restName = `${capitalizedName}'s Cafe`;
+  const restSlug = `${generateSlug(capitalizedName)}-cafe-${Math.floor(100 + Math.random() * 900)}`;
+
+  const newRest: Restaurant = {
+    id: `rest-${Date.now()}`,
+    owner_id: user.id,
+    name: restName,
+    slug: restSlug,
+    description: `Welcome to ${restName}! Explore our chef-crafted menu.`,
+    restaurant_type: "Café",
+    logo_url: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=200&auto=format&fit=crop&q=80",
+    cover_image_url: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=1200&auto=format&fit=crop&q=80",
+    phone: "+91 98765 43210",
+    whatsapp: "+919876543210",
+    instagram: null,
+    address: "Indiranagar",
+    city: "Bengaluru",
+    state: "Karnataka",
+    country: "India",
+    currency: "INR",
+    template_key: "cafe",
+    primary_color: "#10B981",
+    secondary_color: "#047857",
+    published: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const starterCat1: Category = {
+    id: `cat-${Date.now()}-1`,
+    restaurant_id: newRest.id,
+    name: "Artisanal Beverages",
+    description: "Freshly brewed coffees and refreshing drinks",
+    position: 0,
+    is_visible: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const starterCat2: Category = {
+    id: `cat-${Date.now()}-2`,
+    restaurant_id: newRest.id,
+    name: "Chef's Specials",
+    description: "Popular handcrafted snacks and meals",
+    position: 1,
+    is_visible: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const starterItem1: MenuItem = {
+    id: `item-${Date.now()}-1`,
+    restaurant_id: newRest.id,
+    category_id: starterCat1.id,
+    name: "Classic Cappuccino",
+    description: "Rich espresso topped with velvety steamed milk foam and cocoa dusting",
+    price: 180,
+    image_url: "https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=600&auto=format&fit=crop&q=80",
+    food_type: "veg",
+    is_available: true,
+    is_visible: true,
+    is_bestseller: true,
+    is_spicy: false,
+    is_vegan: false,
+    is_jain: true,
+    position: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const starterItem2: MenuItem = {
+    id: `item-${Date.now()}-2`,
+    restaurant_id: newRest.id,
+    category_id: starterCat2.id,
+    name: "Paneer Tikka Panini",
+    description: "Char-grilled spiced cottage cheese with mint chutney in artisanal sourdough",
+    price: 240,
+    image_url: "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=600&auto=format&fit=crop&q=80",
+    food_type: "veg",
+    is_available: true,
+    is_visible: true,
+    is_bestseller: true,
+    is_spicy: true,
+    is_vegan: false,
+    is_jain: false,
+    position: 0,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  return {
+    restaurant: newRest,
+    categories: [starterCat1, starterCat2],
+    items: [starterItem1, starterItem2],
+  };
+}
+
 export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<Profile | null>(null);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -69,22 +173,30 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
       const cList: Category[] = storedCategories ? JSON.parse(storedCategories) : DEMO_CATEGORIES;
       const iList: MenuItem[] = storedItems ? JSON.parse(storedItems) : DEMO_ITEMS;
 
-      setAllRestaurants(rList);
-      setAllCategories(cList);
-      setAllItems(iList);
-
       if (storedUser) {
         const parsedUser: Profile = JSON.parse(storedUser);
         setUser(parsedUser);
-        const userRest = rList.find((r) => r.owner_id === parsedUser.id) || null;
-        setRestaurant(userRest);
-        if (userRest) {
-          setCategories(cList.filter((c) => c.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
-          setItems(iList.filter((i) => i.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
-        } else {
-          setCategories([]);
-          setItems([]);
+        let userRest = rList.find((r) => r.owner_id === parsedUser.id) || null;
+        
+        // If logged-in user doesn't have a restaurant yet, generate one instantly so dashboard never hangs
+        if (!userRest) {
+          const starter = createStarterRestaurantForUser(parsedUser);
+          userRest = starter.restaurant;
+          rList.push(starter.restaurant);
+          cList.push(...starter.categories);
+          iList.push(...starter.items);
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}_restaurants`, JSON.stringify(rList));
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}_categories`, JSON.stringify(cList));
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}_items`, JSON.stringify(iList));
         }
+
+        setAllRestaurants(rList);
+        setAllCategories(cList);
+        setAllItems(iList);
+
+        setRestaurant(userRest);
+        setCategories(cList.filter((c) => c.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
+        setItems(iList.filter((i) => i.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
       } else {
         // Default to demo owner initially
         const defaultOwner: Profile = {
@@ -96,6 +208,9 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
         };
         setUser(defaultOwner);
         setRestaurant(DEMO_RESTAURANT);
+        setAllRestaurants(rList);
+        setAllCategories(cList);
+        setAllItems(iList);
         setCategories(cList.filter((c) => c.restaurant_id === DEMO_RESTAURANT_ID).sort((a, b) => a.position - b.position));
         setItems(iList.filter((i) => i.restaurant_id === DEMO_RESTAURANT_ID).sort((a, b) => a.position - b.position));
         localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(defaultOwner));
@@ -167,15 +282,18 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     setUser(existingUser);
     localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(existingUser));
 
-    // Load their restaurant
-    const userRest = allRestaurants.find((r) => r.owner_id === existingUser!.id) || null;
-    setRestaurant(userRest);
-    if (userRest) {
-      setCategories(allCategories.filter((c) => c.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
-      setItems(allItems.filter((i) => i.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
+    // Load their restaurant or create an instant starter restaurant
+    const existingRest = allRestaurants.find((r) => r.owner_id === existingUser!.id);
+    if (!existingRest) {
+      const starter = createStarterRestaurantForUser(existingUser);
+      const nextR = [...allRestaurants, starter.restaurant];
+      const nextC = [...allCategories, ...starter.categories];
+      const nextI = [...allItems, ...starter.items];
+      persistState(nextR, nextC, nextI, existingUser);
     } else {
-      setCategories([]);
-      setItems([]);
+      setRestaurant(existingRest);
+      setCategories(allCategories.filter((c) => c.restaurant_id === existingRest.id).sort((a, b) => a.position - b.position));
+      setItems(allItems.filter((i) => i.restaurant_id === existingRest.id).sort((a, b) => a.position - b.position));
     }
 
     return { success: true };
@@ -208,9 +326,12 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     setUser(newUser);
     localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(newUser));
 
-    setRestaurant(null);
-    setCategories([]);
-    setItems([]);
+    // Create instant starter restaurant
+    const starter = createStarterRestaurantForUser(newUser);
+    const nextR = [...allRestaurants, starter.restaurant];
+    const nextC = [...allCategories, ...starter.categories];
+    const nextI = [...allItems, ...starter.items];
+    persistState(nextR, nextC, nextI, newUser);
 
     return { success: true };
   };
@@ -236,14 +357,17 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     setUser(newUser);
     localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(newUser));
 
-    const userRest = allRestaurants.find((r) => r.owner_id === newUser.id) || null;
-    setRestaurant(userRest);
-    if (userRest) {
-      setCategories(allCategories.filter((c) => c.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
-      setItems(allItems.filter((i) => i.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
+    const existingRest = allRestaurants.find((r) => r.owner_id === newUser.id);
+    if (!existingRest) {
+      const starter = createStarterRestaurantForUser(newUser);
+      const nextR = [...allRestaurants, starter.restaurant];
+      const nextC = [...allCategories, ...starter.categories];
+      const nextI = [...allItems, ...starter.items];
+      persistState(nextR, nextC, nextI, newUser);
     } else {
-      setCategories([]);
-      setItems([]);
+      setRestaurant(existingRest);
+      setCategories(allCategories.filter((c) => c.restaurant_id === existingRest.id).sort((a, b) => a.position - b.position));
+      setItems(allItems.filter((i) => i.restaurant_id === existingRest.id).sort((a, b) => a.position - b.position));
     }
   };
 
