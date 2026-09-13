@@ -1,51 +1,49 @@
-"use client";
-
-import React, { use } from "react";
-import { useMenuStore } from "@/lib/store";
+import React from "react";
+import type { Metadata } from "next";
+import { getPublicRestaurantBySlug } from "@/lib/supabase/queries";
 import { PublicMenuView } from "@/components/public-menu/public-menu-view";
-import Link from "next/link";
-import { UtensilsCrossed, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ClientMenuFallback } from "@/components/public-menu/client-menu-fallback";
 
-export default function PublicMenuPage({
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const data = await getPublicRestaurantBySlug(slug);
+
+  if (!data) {
+    return {
+      title: "Digital Menu | MenuMint",
+      description: "Scan, view, and explore chef-crafted digital menus.",
+    };
+  }
+
+  const rest = data.restaurant;
+  return {
+    title: `${rest.name} - Digital Menu | MenuMint`,
+    description: rest.description || `Explore the chef-crafted digital menu for ${rest.name}.`,
+    openGraph: {
+      title: `${rest.name} - Digital Menu`,
+      description: rest.description || `Explore the chef-crafted digital menu for ${rest.name}.`,
+      images: rest.cover_image_url ? [{ url: rest.cover_image_url }] : [],
+    },
+  };
+}
+
+export default async function PublicMenuPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const resolvedParams = use(params);
-  const slug = resolvedParams.slug;
-  const { getPublicRestaurant, isLoading } = useMenuStore();
+  const { slug } = await params;
+  const data = await getPublicRestaurantBySlug(slug);
 
-  const data = getPublicRestaurant(slug);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-zinc-950 flex flex-col items-center justify-center p-4">
-        <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-sm font-medium text-zinc-500">Opening menu...</p>
-      </div>
-    );
+  // If found in Supabase (or demo), render directly
+  if (data) {
+    return <PublicMenuView data={data} />;
   }
 
-  if (!data) {
-    return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 mb-4">
-          <UtensilsCrossed className="w-8 h-8" />
-        </div>
-        <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Restaurant Menu Not Found</h1>
-        <p className="text-xs text-zinc-500 max-w-sm mx-auto mt-1 mb-6">
-          The menu for <span className="font-mono text-zinc-700 dark:text-zinc-300">"{slug}"</span> doesn't exist or is currently unpublished.
-        </p>
-        <Link href="/">
-          <Button variant="primary" size="sm">
-            <ArrowLeft className="w-4 h-4 mr-1.5" />
-            Go to MenuMint
-          </Button>
-        </Link>
-      </div>
-    );
-  }
-
-  return <PublicMenuView data={data} />;
+  // Otherwise, allow client-side fallback (e.g. for offline local development storage)
+  return <ClientMenuFallback slug={slug} />;
 }

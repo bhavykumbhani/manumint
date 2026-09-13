@@ -1,9 +1,10 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { Category, FullRestaurantData, MenuItem, Profile, Restaurant, TemplateKey } from "@/types";
 import { DEMO_CATEGORIES, DEMO_ITEMS, DEMO_OWNER_ID, DEMO_RESTAURANT, DEMO_RESTAURANT_ID } from "@/lib/demo-data";
 import { generateSlug } from "@/lib/utils";
+import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 interface MenuStoreContextType {
   user: Profile | null;
@@ -11,11 +12,12 @@ interface MenuStoreContextType {
   categories: Category[];
   items: MenuItem[];
   isLoading: boolean;
-  
+  isCloudConnected: boolean;
+
   // Auth methods
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   signup: (fullName: string, email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
+  logout: () => Promise<void>;
   switchAccount: (email: string, fullName?: string) => void;
 
   // Restaurant methods
@@ -23,15 +25,18 @@ interface MenuStoreContextType {
   updateRestaurant: (updates: Partial<Restaurant>) => Promise<void>;
   publishRestaurant: () => Promise<{ success: boolean; error?: string }>;
   setTemplate: (template: TemplateKey) => Promise<void>;
-  
+
   // Category methods
-  addCategory: (name: string, description?: string) => Promise<Category>;
+  addCategory: (name: string, description?: string, targetRestaurantId?: string) => Promise<Category>;
   updateCategory: (id: string, updates: Partial<Category>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   moveCategory: (id: string, direction: "up" | "down") => Promise<void>;
 
   // Item methods
-  addItem: (item: Omit<MenuItem, "id" | "restaurant_id" | "position" | "created_at" | "updated_at">) => Promise<MenuItem>;
+  addItem: (
+    item: Omit<MenuItem, "id" | "restaurant_id" | "position" | "created_at" | "updated_at">,
+    targetRestaurantId?: string
+  ) => Promise<MenuItem>;
   updateItem: (id: string, updates: Partial<MenuItem>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   duplicateItem: (id: string) => Promise<MenuItem>;
@@ -41,6 +46,7 @@ interface MenuStoreContextType {
 
   // Public retrieval
   getPublicRestaurant: (slug: string) => FullRestaurantData | null;
+  refreshData: () => Promise<void>;
 }
 
 const STORAGE_KEY_PREFIX = "menumint_v1";
@@ -160,10 +166,124 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [allItems, setAllItems] = useState<MenuItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCloudConnected, setIsCloudConnected] = useState(false);
 
-  // Load from local storage or initialize seed
-  useEffect(() => {
+  // Helper to persist state to localStorage (offline/cache)
+  const persistLocalState = (
+    nextRestaurants: Restaurant[],
+    nextCategories: Category[],
+    nextItems: MenuItem[],
+    currentUser = user
+  ) => {
     try {
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}_restaurants`, JSON.stringify(nextRestaurants));
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}_categories`, JSON.stringify(nextCategories));
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}_items`, JSON.stringify(nextItems));
+    } catch {
+      // Ignore storage quota
+    }
+
+    setAllRestaurants(nextRestaurants);
+    setAllCategories(nextCategories);
+    setAllItems(nextItems);
+
+    if (currentUser) {
+      // Find the most recently updated or created restaurant for this user
+      const userRests = nextRestaurants.filter((r) => r.owner_id === currentUser.id);
+      const userRest = userRests.length > 0 ? userRests[userRests.length - 1] : null;
+
+      setRestaurant(userRest);
+      if (userRest) {
+        setCategories(
+          nextCategories
+            .filter((c) => c.restaurant_id === userRest.id)
+            .sort((a, b) => a.position - b.position)
+        );
+        setItems(
+          nextItems
+            .filter((i) => i.restaurant_id === userRest.id)
+            .sort((a, b) => a.position - b.position)
+        );
+      } else {
+        setCategories([]);
+        setItems([]);
+      }
+    }
+  };
+
+  // Load from Supabase or fallback to localStorage
+  const refreshData = useCallback(async () => {
+    setIsLoading(true);
+    const supabase = getSupabaseBrowserClient();
+    const cloudAvailable = isSupabaseConfigured() && Boolean(supabase);
+    setIsCloudConnected(cloudAvailable);
+
+    try {
+      if (cloudAvailable && supabase) {
+        // 1. Check Supabase Auth Session
+        const { data: sessionData } = await supabase.auth.getSession();
+        const authUser = sessionData?.session?.user;
+
+        if (authUser) {
+          // Fetch or generate Profile
+          const profile: Profile = {
+            id: authUser.id,
+            email: authUser.email || "",
+            full_name: authUser.user_metadata?.full_name || authUser.email?.split("@")[0] || "Restaurant Owner",
+            created_at: authUser.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          setUser(profile);
+
+          // Fetch user's restaurants from Supabase
+          const { data: userRests, error: restErr } = await supabase
+            .from("restaurants")
+            .select("*")
+            .eq("owner_id", authUser.id)
+            .order("created_at", { ascending: false });
+
+          if (restErr) {
+            console.error("Failed to load restaurants from Supabase:", restErr);
+          }
+
+          if (userRests && userRests.length > 0) {
+            const activeRest = userRests[0] as Restaurant;
+            setRestaurant(activeRest);
+
+            // Fetch categories for this restaurant
+            const { data: catData } = await supabase
+              .from("categories")
+              .select("*")
+              .eq("restaurant_id", activeRest.id)
+              .order("position", { ascending: true });
+
+            // Fetch items for this restaurant
+            const { data: itemData } = await supabase
+              .from("menu_items")
+              .select("*")
+              .eq("restaurant_id", activeRest.id)
+              .order("position", { ascending: true });
+
+            const validCats = (catData as Category[]) || [];
+            const validItems = (itemData as MenuItem[]) || [];
+
+            setCategories(validCats);
+            setItems(validItems);
+            setAllRestaurants(userRests as Restaurant[]);
+            setAllCategories(validCats);
+            setAllItems(validItems);
+          } else {
+            // User is signed in to Supabase but has no restaurant yet
+            setRestaurant(null);
+            setCategories([]);
+            setItems([]);
+          }
+          return;
+        }
+      }
+
+      // Offline / LocalStorage Fallback
+      const isExplicitlyLoggedOut = localStorage.getItem(`${STORAGE_KEY_PREFIX}_logged_out`) === "true";
       const storedUser = localStorage.getItem(`${STORAGE_KEY_PREFIX}_current_user`);
       const storedRestaurants = localStorage.getItem(`${STORAGE_KEY_PREFIX}_restaurants`);
       const storedCategories = localStorage.getItem(`${STORAGE_KEY_PREFIX}_categories`);
@@ -173,32 +293,34 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
       const cList: Category[] = storedCategories ? JSON.parse(storedCategories) : DEMO_CATEGORIES;
       const iList: MenuItem[] = storedItems ? JSON.parse(storedItems) : DEMO_ITEMS;
 
-      if (storedUser) {
+      setAllRestaurants(rList);
+      setAllCategories(cList);
+      setAllItems(iList);
+
+      if (isExplicitlyLoggedOut) {
+        // User explicitly logged out: do not force demo user!
+        setUser(null);
+        setRestaurant(null);
+        setCategories([]);
+        setItems([]);
+      } else if (storedUser) {
         const parsedUser: Profile = JSON.parse(storedUser);
         setUser(parsedUser);
-        let userRest = rList.find((r) => r.owner_id === parsedUser.id) || null;
-        
-        // If logged-in user doesn't have a restaurant yet, generate one instantly so dashboard never hangs
-        if (!userRest) {
-          const starter = createStarterRestaurantForUser(parsedUser);
-          userRest = starter.restaurant;
-          rList.push(starter.restaurant);
-          cList.push(...starter.categories);
-          iList.push(...starter.items);
-          localStorage.setItem(`${STORAGE_KEY_PREFIX}_restaurants`, JSON.stringify(rList));
-          localStorage.setItem(`${STORAGE_KEY_PREFIX}_categories`, JSON.stringify(cList));
-          localStorage.setItem(`${STORAGE_KEY_PREFIX}_items`, JSON.stringify(iList));
-        }
 
-        setAllRestaurants(rList);
-        setAllCategories(cList);
-        setAllItems(iList);
+        // Find user's restaurant (pick latest)
+        const userRests = rList.filter((r) => r.owner_id === parsedUser.id);
+        const userRest = userRests.length > 0 ? userRests[userRests.length - 1] : null;
 
         setRestaurant(userRest);
-        setCategories(cList.filter((c) => c.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
-        setItems(iList.filter((i) => i.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
+        if (userRest) {
+          setCategories(cList.filter((c) => c.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
+          setItems(iList.filter((i) => i.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
+        } else {
+          setCategories([]);
+          setItems([]);
+        }
       } else {
-        // Default to demo owner initially
+        // Default to demo owner initially if never interacted
         const defaultOwner: Profile = {
           id: DEMO_OWNER_ID,
           full_name: "Aarav Sharma",
@@ -208,66 +330,78 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
         };
         setUser(defaultOwner);
         setRestaurant(DEMO_RESTAURANT);
-        setAllRestaurants(rList);
-        setAllCategories(cList);
-        setAllItems(iList);
         setCategories(cList.filter((c) => c.restaurant_id === DEMO_RESTAURANT_ID).sort((a, b) => a.position - b.position));
         setItems(iList.filter((i) => i.restaurant_id === DEMO_RESTAURANT_ID).sort((a, b) => a.position - b.position));
-        localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(defaultOwner));
       }
     } catch (e) {
-      console.error("Failed to load store from localStorage", e);
+      console.error("Store initialization error:", e);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Save changes to localStorage helper
-  const persistState = (
-    nextRestaurants: Restaurant[],
-    nextCategories: Category[],
-    nextItems: MenuItem[],
-    currentUser = user
-  ) => {
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}_restaurants`, JSON.stringify(nextRestaurants));
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}_categories`, JSON.stringify(nextCategories));
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}_items`, JSON.stringify(nextItems));
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
-    setAllRestaurants(nextRestaurants);
-    setAllCategories(nextCategories);
-    setAllItems(nextItems);
+  // Auth: Login
+  const login = async (email: string, password?: string): Promise<{ success: boolean; error?: string }> => {
+    const cleanEmail = email.toLowerCase().trim();
+    localStorage.removeItem(`${STORAGE_KEY_PREFIX}_logged_out`);
 
-    if (currentUser) {
-      const userRest = nextRestaurants.find((r) => r.owner_id === currentUser.id) || null;
-      setRestaurant(userRest);
-      if (userRest) {
-        setCategories(nextCategories.filter((c) => c.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
-        setItems(nextItems.filter((i) => i.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
-      } else {
-        setCategories([]);
-        setItems([]);
+    const supabase = getSupabaseBrowserClient();
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: password || "password123",
+        });
+
+        if (error) {
+          // If demo owner is requested and doesn't exist in Supabase auth, allow fallback demo login
+          if (cleanEmail === "owner@cafearoma.in") {
+            const defaultOwner: Profile = {
+              id: DEMO_OWNER_ID,
+              full_name: "Aarav Sharma",
+              email: "owner@cafearoma.in",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+            setUser(defaultOwner);
+            setRestaurant(DEMO_RESTAURANT);
+            setCategories(DEMO_CATEGORIES);
+            setItems(DEMO_ITEMS);
+            localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(defaultOwner));
+            return { success: true };
+          }
+          return { success: false, error: error.message };
+        }
+
+        if (data.user) {
+          await refreshData();
+          return { success: true };
+        }
+      } catch (err: any) {
+        return { success: false, error: err.message || "Failed to sign in" };
       }
     }
-  };
 
-  const login = async (email: string): Promise<{ success: boolean; error?: string }> => {
-    const cleanEmail = email.toLowerCase().trim();
-    let existingUser: Profile | null = null;
+    // Local / Offline fallback
     const usersStr = localStorage.getItem(`${STORAGE_KEY_PREFIX}_registered_users`);
-    const registeredUsers: Profile[] = usersStr ? JSON.parse(usersStr) : [
-      {
-        id: DEMO_OWNER_ID,
-        full_name: "Aarav Sharma",
-        email: "owner@cafearoma.in",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-    ];
+    const registeredUsers: Profile[] = usersStr
+      ? JSON.parse(usersStr)
+      : [
+          {
+            id: DEMO_OWNER_ID,
+            full_name: "Aarav Sharma",
+            email: "owner@cafearoma.in",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ];
 
-    existingUser = registeredUsers.find((u) => u.email.toLowerCase() === cleanEmail) || null;
-
+    let existingUser = registeredUsers.find((u) => u.email.toLowerCase() === cleanEmail) || null;
     if (!existingUser) {
-      // Auto-register convenience for seamless testing
       existingUser = {
         id: `user-${Date.now()}`,
         full_name: cleanEmail.split("@")[0],
@@ -282,35 +416,81 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     setUser(existingUser);
     localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(existingUser));
 
-    // Load their restaurant or create an instant starter restaurant
-    const existingRest = allRestaurants.find((r) => r.owner_id === existingUser!.id);
+    // Find user's restaurant or create starter
+    const userRests = allRestaurants.filter((r) => r.owner_id === existingUser!.id);
+    const existingRest = userRests.length > 0 ? userRests[userRests.length - 1] : null;
+
     if (!existingRest) {
       const starter = createStarterRestaurantForUser(existingUser);
       const nextR = [...allRestaurants, starter.restaurant];
       const nextC = [...allCategories, ...starter.categories];
       const nextI = [...allItems, ...starter.items];
-      persistState(nextR, nextC, nextI, existingUser);
+      persistLocalState(nextR, nextC, nextI, existingUser);
     } else {
       setRestaurant(existingRest);
-      setCategories(allCategories.filter((c) => c.restaurant_id === existingRest.id).sort((a, b) => a.position - b.position));
-      setItems(allItems.filter((i) => i.restaurant_id === existingRest.id).sort((a, b) => a.position - b.position));
+      setCategories(
+        allCategories
+          .filter((c) => c.restaurant_id === existingRest.id)
+          .sort((a, b) => a.position - b.position)
+      );
+      setItems(
+        allItems
+          .filter((i) => i.restaurant_id === existingRest.id)
+          .sort((a, b) => a.position - b.position)
+      );
     }
 
     return { success: true };
   };
 
-  const signup = async (fullName: string, email: string): Promise<{ success: boolean; error?: string }> => {
+  // Auth: Signup
+  const signup = async (
+    fullName: string,
+    email: string,
+    password?: string
+  ): Promise<{ success: boolean; error?: string }> => {
     const cleanEmail = email.toLowerCase().trim();
-    const usersStr = localStorage.getItem(`${STORAGE_KEY_PREFIX}_registered_users`);
-    const registeredUsers: Profile[] = usersStr ? JSON.parse(usersStr) : [
-      {
-        id: DEMO_OWNER_ID,
-        full_name: "Aarav Sharma",
-        email: "owner@cafearoma.in",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+    localStorage.removeItem(`${STORAGE_KEY_PREFIX}_logged_out`);
+
+    const supabase = getSupabaseBrowserClient();
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password: password || "password123",
+          options: {
+            data: {
+              full_name: fullName.trim(),
+            },
+          },
+        });
+
+        if (error) {
+          return { success: false, error: error.message };
+        }
+
+        if (data.user) {
+          const newProfile: Profile = {
+            id: data.user.id,
+            email: cleanEmail,
+            full_name: fullName.trim(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          setUser(newProfile);
+          setRestaurant(null);
+          setCategories([]);
+          setItems([]);
+          return { success: true };
+        }
+      } catch (err: any) {
+        return { success: false, error: err.message || "Failed to create account" };
       }
-    ];
+    }
+
+    // Local / Offline fallback
+    const usersStr = localStorage.getItem(`${STORAGE_KEY_PREFIX}_registered_users`);
+    const registeredUsers: Profile[] = usersStr ? JSON.parse(usersStr) : [];
 
     const newUser: Profile = {
       id: `user-${Date.now()}`,
@@ -326,24 +506,33 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     setUser(newUser);
     localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(newUser));
 
-    // Create instant starter restaurant
-    const starter = createStarterRestaurantForUser(newUser);
-    const nextR = [...allRestaurants, starter.restaurant];
-    const nextC = [...allCategories, ...starter.categories];
-    const nextI = [...allItems, ...starter.items];
-    persistState(nextR, nextC, nextI, newUser);
+    setRestaurant(null);
+    setCategories([]);
+    setItems([]);
 
     return { success: true };
   };
 
-  const logout = () => {
+  // Auth: Logout
+  const logout = async () => {
+    const supabase = getSupabaseBrowserClient();
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {
+        console.error("Supabase signOut error:", e);
+      }
+    }
+
     setUser(null);
     setRestaurant(null);
     setCategories([]);
     setItems([]);
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}_logged_out`, "true");
     localStorage.removeItem(`${STORAGE_KEY_PREFIX}_current_user`);
   };
 
+  // Quick switch account for development/demo
   const switchAccount = (email: string, fullName?: string) => {
     const cleanEmail = email.toLowerCase().trim();
     const newUser: Profile = {
@@ -355,22 +544,34 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     };
 
     setUser(newUser);
+    localStorage.removeItem(`${STORAGE_KEY_PREFIX}_logged_out`);
     localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(newUser));
 
-    const existingRest = allRestaurants.find((r) => r.owner_id === newUser.id);
+    const userRests = allRestaurants.filter((r) => r.owner_id === newUser.id);
+    const existingRest = userRests.length > 0 ? userRests[userRests.length - 1] : null;
+
     if (!existingRest) {
       const starter = createStarterRestaurantForUser(newUser);
       const nextR = [...allRestaurants, starter.restaurant];
       const nextC = [...allCategories, ...starter.categories];
       const nextI = [...allItems, ...starter.items];
-      persistState(nextR, nextC, nextI, newUser);
+      persistLocalState(nextR, nextC, nextI, newUser);
     } else {
       setRestaurant(existingRest);
-      setCategories(allCategories.filter((c) => c.restaurant_id === existingRest.id).sort((a, b) => a.position - b.position));
-      setItems(allItems.filter((i) => i.restaurant_id === existingRest.id).sort((a, b) => a.position - b.position));
+      setCategories(
+        allCategories
+          .filter((c) => c.restaurant_id === existingRest.id)
+          .sort((a, b) => a.position - b.position)
+      );
+      setItems(
+        allItems
+          .filter((i) => i.restaurant_id === existingRest.id)
+          .sort((a, b) => a.position - b.position)
+      );
     }
   };
 
+  // Create Restaurant (Cloud + Local)
   const createRestaurant = async (data: Partial<Restaurant>): Promise<Restaurant> => {
     if (!user) throw new Error("Must be logged in to create restaurant");
 
@@ -381,8 +582,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
       slug = `${baseSlug}-${counter++}`;
     }
 
-    const newRest: Restaurant = {
-      id: `rest-${Date.now()}`,
+    const newRestData: Partial<Restaurant> = {
       owner_id: user.id,
       name: data.name || "My Restaurant",
       slug: data.slug ? generateSlug(data.slug) : slug,
@@ -401,18 +601,68 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
       template_key: data.template_key || "cafe",
       primary_color: data.primary_color || "#10B981",
       secondary_color: data.secondary_color || "#047857",
-      published: data.published ?? false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      published: data.published ?? true,
     };
 
-    const nextRestaurants = [...allRestaurants, newRest];
-    persistState(nextRestaurants, allCategories, allItems);
-    return newRest;
+    const supabase = getSupabaseBrowserClient();
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        const { data: created, error } = await supabase
+          .from("restaurants")
+          .insert(newRestData)
+          .select()
+          .single();
+
+        if (error) throw error;
+        const createdRest = created as Restaurant;
+        setRestaurant(createdRest);
+        setAllRestaurants((prev) => [createdRest, ...prev]);
+        return createdRest;
+      } catch (err) {
+        console.error("Failed to insert restaurant in Supabase, falling back to local:", err);
+      }
+    }
+
+    // Local fallback
+    const localRest: Restaurant = {
+      ...newRestData,
+      id: `rest-${Date.now()}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as Restaurant;
+
+    // Replace any previous starter restaurant for this user so no conflicts occur
+    const filteredRestaurants = allRestaurants.filter((r) => r.owner_id !== user.id);
+    const nextRestaurants = [...filteredRestaurants, localRest];
+    persistLocalState(nextRestaurants, allCategories, allItems, user);
+    setRestaurant(localRest);
+    return localRest;
   };
 
+  // Update Restaurant
   const updateRestaurant = async (updates: Partial<Restaurant>) => {
     if (!restaurant) return;
+
+    const supabase = getSupabaseBrowserClient();
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        const { data: updated, error } = await supabase
+          .from("restaurants")
+          .update({ ...updates, updated_at: new Date().toISOString() })
+          .eq("id", restaurant.id)
+          .select()
+          .single();
+
+        if (!error && updated) {
+          setRestaurant(updated as Restaurant);
+          setAllRestaurants((prev) => prev.map((r) => (r.id === restaurant.id ? (updated as Restaurant) : r)));
+          return;
+        }
+      } catch (err) {
+        console.error("Supabase updateRestaurant error:", err);
+      }
+    }
+
     const updated: Restaurant = {
       ...restaurant,
       ...updates,
@@ -420,33 +670,63 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     };
 
     const nextRestaurants = allRestaurants.map((r) => (r.id === restaurant.id ? updated : r));
-    persistState(nextRestaurants, allCategories, allItems);
+    persistLocalState(nextRestaurants, allCategories, allItems);
   };
 
+  // Publish Restaurant
   const publishRestaurant = async (): Promise<{ success: boolean; error?: string }> => {
     if (!restaurant) return { success: false, error: "No restaurant found" };
     if (!restaurant.name.trim()) return { success: false, error: "Restaurant name is required" };
-    if (categories.length === 0) return { success: false, error: "Please create at least one category before publishing" };
-    
-    const visibleItems = items.filter((i) => i.is_visible);
-    if (visibleItems.length === 0) {
-      return { success: false, error: "Please add at least one visible menu item before publishing" };
-    }
 
     await updateRestaurant({ published: true });
     return { success: true };
   };
 
+  // Set Template
   const setTemplate = async (template: TemplateKey) => {
     await updateRestaurant({ template_key: template });
   };
 
-  const addCategory = async (name: string, description?: string): Promise<Category> => {
-    if (!restaurant) throw new Error("No restaurant active");
+  // Add Category
+  const addCategory = async (
+    name: string,
+    description?: string,
+    targetRestaurantId?: string
+  ): Promise<Category> => {
+    const targetId = targetRestaurantId || restaurant?.id;
+    if (!targetId) throw new Error("No restaurant active");
+
+    const categoryData: Partial<Category> = {
+      restaurant_id: targetId,
+      name: name.trim(),
+      description: description?.trim() || null,
+      position: categories.length,
+      is_visible: true,
+    };
+
+    const supabase = getSupabaseBrowserClient();
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        const { data: created, error } = await supabase
+          .from("categories")
+          .insert(categoryData)
+          .select()
+          .single();
+
+        if (!error && created) {
+          const newCat = created as Category;
+          setCategories((prev) => [...prev, newCat]);
+          setAllCategories((prev) => [...prev, newCat]);
+          return newCat;
+        }
+      } catch (err) {
+        console.error("Supabase addCategory error:", err);
+      }
+    }
 
     const newCategory: Category = {
       id: `cat-${Date.now()}`,
-      restaurant_id: restaurant.id,
+      restaurant_id: targetId,
       name: name.trim(),
       description: description?.trim() || null,
       position: categories.length,
@@ -456,23 +736,47 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     };
 
     const nextCategories = [...allCategories, newCategory];
-    persistState(allRestaurants, nextCategories, allItems);
+    persistLocalState(allRestaurants, nextCategories, allItems);
     return newCategory;
   };
 
+  // Update Category
   const updateCategory = async (id: string, updates: Partial<Category>) => {
+    const supabase = getSupabaseBrowserClient();
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await supabase
+          .from("categories")
+          .update({ ...updates, updated_at: new Date().toISOString() })
+          .eq("id", id);
+      } catch (err) {
+        console.error("Supabase updateCategory error:", err);
+      }
+    }
+
     const nextCategories = allCategories.map((c) =>
       c.id === id ? { ...c, ...updates, updated_at: new Date().toISOString() } : c
     );
-    persistState(allRestaurants, nextCategories, allItems);
+    persistLocalState(allRestaurants, nextCategories, allItems);
   };
 
+  // Delete Category
   const deleteCategory = async (id: string) => {
+    const supabase = getSupabaseBrowserClient();
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await supabase.from("categories").delete().eq("id", id);
+      } catch (err) {
+        console.error("Supabase deleteCategory error:", err);
+      }
+    }
+
     const nextCategories = allCategories.filter((c) => c.id !== id);
     const nextItems = allItems.filter((i) => i.category_id !== id);
-    persistState(allRestaurants, nextCategories, nextItems);
+    persistLocalState(allRestaurants, nextCategories, nextItems);
   };
 
+  // Move Category
   const moveCategory = async (id: string, direction: "up" | "down") => {
     const currentIndex = categories.findIndex((c) => c.id === id);
     if (currentIndex === -1) return;
@@ -490,59 +794,122 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
       return match || c;
     });
 
-    persistState(allRestaurants, nextCategories, allItems);
+    const supabase = getSupabaseBrowserClient();
+    if (isSupabaseConfigured() && supabase) {
+      for (const cat of reindexed) {
+        supabase.from("categories").update({ position: cat.position }).eq("id", cat.id);
+      }
+    }
+
+    persistLocalState(allRestaurants, nextCategories, allItems);
   };
 
+  // Add Item
   const addItem = async (
-    itemData: Omit<MenuItem, "id" | "restaurant_id" | "position" | "created_at" | "updated_at">
+    itemData: Omit<MenuItem, "id" | "restaurant_id" | "position" | "created_at" | "updated_at">,
+    targetRestaurantId?: string
   ): Promise<MenuItem> => {
-    if (!restaurant) throw new Error("No restaurant active");
+    const targetId = targetRestaurantId || restaurant?.id;
+    if (!targetId) throw new Error("No restaurant active");
 
     const categoryItems = items.filter((i) => i.category_id === itemData.category_id);
+    const newItemData: Partial<MenuItem> = {
+      ...itemData,
+      restaurant_id: targetId,
+      position: categoryItems.length,
+    };
+
+    const supabase = getSupabaseBrowserClient();
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        const { data: created, error } = await supabase
+          .from("menu_items")
+          .insert(newItemData)
+          .select()
+          .single();
+
+        if (!error && created) {
+          const newItem = created as MenuItem;
+          setItems((prev) => [...prev, newItem]);
+          setAllItems((prev) => [...prev, newItem]);
+          return newItem;
+        }
+      } catch (err) {
+        console.error("Supabase addItem error:", err);
+      }
+    }
+
     const newItem: MenuItem = {
       ...itemData,
       id: `item-${Date.now()}`,
-      restaurant_id: restaurant.id,
+      restaurant_id: targetId,
       position: categoryItems.length,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
     const nextItems = [...allItems, newItem];
-    persistState(allRestaurants, allCategories, nextItems);
+    persistLocalState(allRestaurants, allCategories, nextItems);
     return newItem;
   };
 
+  // Update Item
   const updateItem = async (id: string, updates: Partial<MenuItem>) => {
+    const supabase = getSupabaseBrowserClient();
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await supabase
+          .from("menu_items")
+          .update({ ...updates, updated_at: new Date().toISOString() })
+          .eq("id", id);
+      } catch (err) {
+        console.error("Supabase updateItem error:", err);
+      }
+    }
+
     const nextItems = allItems.map((i) =>
       i.id === id ? { ...i, ...updates, updated_at: new Date().toISOString() } : i
     );
-    persistState(allRestaurants, allCategories, nextItems);
+    persistLocalState(allRestaurants, allCategories, nextItems);
   };
 
+  // Delete Item
   const deleteItem = async (id: string) => {
+    const supabase = getSupabaseBrowserClient();
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await supabase.from("menu_items").delete().eq("id", id);
+      } catch (err) {
+        console.error("Supabase deleteItem error:", err);
+      }
+    }
+
     const nextItems = allItems.filter((i) => i.id !== id);
-    persistState(allRestaurants, allCategories, nextItems);
+    persistLocalState(allRestaurants, allCategories, nextItems);
   };
 
+  // Duplicate Item
   const duplicateItem = async (id: string): Promise<MenuItem> => {
     const itemToDup = items.find((i) => i.id === id);
     if (!itemToDup) throw new Error("Item not found");
 
-    const duplicated: MenuItem = {
-      ...itemToDup,
-      id: `item-${Date.now()}`,
+    return await addItem({
+      category_id: itemToDup.category_id,
       name: `${itemToDup.name} (Copy)`,
-      position: items.filter((i) => i.category_id === itemToDup.category_id).length,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    const nextItems = [...allItems, duplicated];
-    persistState(allRestaurants, allCategories, nextItems);
-    return duplicated;
+      description: itemToDup.description,
+      price: itemToDup.price,
+      image_url: itemToDup.image_url,
+      food_type: itemToDup.food_type,
+      is_available: itemToDup.is_available,
+      is_visible: itemToDup.is_visible,
+      is_bestseller: itemToDup.is_bestseller,
+      is_spicy: itemToDup.is_spicy,
+      is_vegan: itemToDup.is_vegan,
+      is_jain: itemToDup.is_jain,
+    });
   };
 
+  // Move Item
   const moveItem = async (id: string, direction: "up" | "down") => {
     const item = items.find((i) => i.id === id);
     if (!item) return;
@@ -564,7 +931,14 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
       return match || i;
     });
 
-    persistState(allRestaurants, allCategories, nextItems);
+    const supabase = getSupabaseBrowserClient();
+    if (isSupabaseConfigured() && supabase) {
+      for (const it of reindexed) {
+        supabase.from("menu_items").update({ position: it.position }).eq("id", it.id);
+      }
+    }
+
+    persistLocalState(allRestaurants, allCategories, nextItems);
   };
 
   const toggleItemAvailability = async (id: string) => {
@@ -579,11 +953,25 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     await updateItem(id, { is_visible: !item.is_visible });
   };
 
+  // Public retrieval (local store lookup for preview/fallback)
   const getPublicRestaurant = (slug: string): FullRestaurantData | null => {
-    const r = allRestaurants.find((item) => item.slug.toLowerCase() === slug.toLowerCase());
-    if (!r) return null;
+    const cleanSlug = slug.toLowerCase().trim();
+    const r = allRestaurants.find((item) => item.slug.toLowerCase() === cleanSlug);
+    if (!r) {
+      if (cleanSlug === DEMO_RESTAURANT.slug.toLowerCase()) {
+        return {
+          restaurant: DEMO_RESTAURANT,
+          categories: DEMO_CATEGORIES.map((cat) => ({
+            ...cat,
+            items: DEMO_ITEMS.filter((i) => i.category_id === cat.id && i.is_visible).sort(
+              (a, b) => a.position - b.position
+            ),
+          })),
+        };
+      }
+      return null;
+    }
 
-    // Filter categories for this restaurant
     const restCategories = allCategories
       .filter((c) => c.restaurant_id === r.id && c.is_visible)
       .sort((a, b) => a.position - b.position)
@@ -611,6 +999,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
         categories,
         items,
         isLoading,
+        isCloudConnected,
         login,
         signup,
         logout,
@@ -631,6 +1020,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
         toggleItemAvailability,
         toggleItemVisibility,
         getPublicRestaurant,
+        refreshData,
       }}
     >
       {children}

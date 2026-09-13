@@ -52,8 +52,8 @@ export default function DashboardLayout({
     { label: "Account", href: "/dashboard/account", icon: User },
   ];
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push("/login");
   };
 

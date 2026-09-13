@@ -97,24 +97,27 @@ export default function OnboardingPage() {
         published: true,
       });
 
-      // 2. Add Category
-      const newCat = await addCategory(categoryName.trim());
+      // 2. Add Category explicitly linked to this new restaurant
+      const newCat = await addCategory(categoryName.trim(), undefined, newRest.id);
 
-      // 3. Add Item
-      await addItem({
-        category_id: newCat.id,
-        name: itemName.trim(),
-        price: parseFloat(itemPrice) || 30,
-        food_type: foodType,
-        description: "Freshly prepared classic with authentic spices",
-        image_url: "https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=500&auto=format&fit=crop&q=80",
-        is_available: true,
-        is_visible: true,
-        is_bestseller: true,
-        is_spicy: false,
-        is_vegan: false,
-        is_jain: true,
-      });
+      // 3. Add Item explicitly linked to this new restaurant
+      await addItem(
+        {
+          category_id: newCat.id,
+          name: itemName.trim(),
+          price: parseFloat(itemPrice) || 30,
+          food_type: foodType,
+          description: "Freshly prepared classic with authentic spices",
+          image_url: "https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=500&auto=format&fit=crop&q=80",
+          is_available: true,
+          is_visible: true,
+          is_bestseller: true,
+          is_spicy: false,
+          is_vegan: false,
+          is_jain: true,
+        },
+        newRest.id
+      );
 
       // 4. Set celebration state
       const targetSlug = newRest.slug;

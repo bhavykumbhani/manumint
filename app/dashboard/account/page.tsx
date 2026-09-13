@@ -9,15 +9,15 @@ import { User, ShieldCheck, LogOut, Users, Key, Mail, Check } from "lucide-react
 
 export default function AccountSettingsPage() {
   const router = useRouter();
-  const { user, logout, switchAccount } = useMenuStore();
+  const { user, logout, switchAccount, isCloudConnected } = useMenuStore();
   const { toast } = useToast();
 
   const [testEmail, setTestEmail] = useState("");
 
   if (!user) return null;
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push("/login");
   };
 
@@ -31,11 +31,27 @@ export default function AccountSettingsPage() {
     <div className="space-y-6 max-w-4xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2">
         <div>
-          <h1 className="text-2xl font-black text-zinc-900 dark:text-zinc-100">
-            Account & Security
-          </h1>
-          <p className="text-xs text-zinc-500">
-            Manage owner profile, authentication sessions, and tenant isolation.
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-black text-zinc-900 dark:text-zinc-100">
+              Account & Security
+            </h1>
+            <span
+              className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                isCloudConnected
+                  ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                  : "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800"
+              }`}
+            >
+              <span
+                className={`w-2 h-2 rounded-full mr-1.5 ${
+                  isCloudConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                }`}
+              />
+              {isCloudConnected ? "Supabase Cloud Connected" : "Local Storage (Offline)"}
+            </span>
+          </div>
+          <p className="text-xs text-zinc-500 mt-1">
+            Manage owner profile, authentication sessions, and database sync status.
           </p>
         </div>
       </div>
