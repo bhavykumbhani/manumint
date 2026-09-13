@@ -38,7 +38,13 @@ export default function DashboardLayout({
       if (!user) {
         router.push("/login");
       } else if (!restaurant && pathname !== "/dashboard/account" && pathname !== "/onboarding") {
-        router.push("/onboarding");
+        // Double check if a restaurant exists in localStorage before redirecting to onboarding
+        const storedRests = typeof window !== "undefined" ? localStorage.getItem("menumint_v1_restaurants") : null;
+        const rList = storedRests ? JSON.parse(storedRests) : [];
+        const hasRestaurant = rList.some((r: any) => r.owner_id === user.id || r.owner_id);
+        if (!hasRestaurant) {
+          router.push("/onboarding");
+        }
       }
     }
   }, [user, restaurant, isLoading, router, pathname]);

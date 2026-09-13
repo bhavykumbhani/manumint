@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { Category, FullRestaurantData, MenuItem, Profile, Restaurant, TemplateKey } from "@/types";
 import { DEMO_CATEGORIES, DEMO_ITEMS, DEMO_OWNER_ID, DEMO_RESTAURANT, DEMO_RESTAURANT_ID } from "@/lib/demo-data";
 import { generateSlug } from "@/lib/utils";
@@ -168,6 +168,9 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isCloudConnected, setIsCloudConnected] = useState(false);
 
+  const restaurantRef = useRef<Restaurant | null>(null);
+  restaurantRef.current = restaurant;
+
   // Helper to persist state to localStorage (offline/cache)
   const persistLocalState = (
     nextRestaurants: Restaurant[],
@@ -180,7 +183,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(`${STORAGE_KEY_PREFIX}_categories`, JSON.stringify(nextCategories));
       localStorage.setItem(`${STORAGE_KEY_PREFIX}_items`, JSON.stringify(nextItems));
     } catch {
-      // Ignore storage quota
+      // Ignore quota
     }
 
     setAllRestaurants(nextRestaurants);
@@ -188,12 +191,11 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     setAllItems(nextItems);
 
     if (currentUser) {
-      // Find the most recently updated or created restaurant for this user
       const userRests = nextRestaurants.filter((r) => r.owner_id === currentUser.id);
-      const userRest = userRests.length > 0 ? userRests[userRests.length - 1] : null;
-
-      setRestaurant(userRest);
-      if (userRest) {
+      if (userRests.length > 0) {
+        const userRest = userRests[userRests.length - 1];
+        setRestaurant(userRest);
+        localStorage.setItem(`${STORAGE_KEY_PREFIX}_active_restaurant_id`, userRest.id);
         setCategories(
           nextCategories
             .filter((c) => c.restaurant_id === userRest.id)
@@ -204,9 +206,6 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
             .filter((i) => i.restaurant_id === userRest.id)
             .sort((a, b) => a.position - b.position)
         );
-      } else {
-        setCategories([]);
-        setItems([]);
       }
     }
   };
@@ -219,13 +218,28 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     setIsCloudConnected(cloudAvailable);
 
     try {
+      // Check stored user first
+      const storedUser = localStorage.getItem(`${STORAGE_KEY_PREFIX}_current_user`);
+      const isExplicitlyLoggedOut = localStorage.getItem(`${STORAGE_KEY_PREFIX}_logged_out`) === "true";
+      const storedRests = localStorage.getItem(`${STORAGE_KEY_PREFIX}_restaurants`);
+      const storedCats = localStorage.getItem(`${STORAGE_KEY_PREFIX}_categories`);
+      const storedItms = localStorage.getItem(`${STORAGE_KEY_PREFIX}_items`);
+      const activeRestId = localStorage.getItem(`${STORAGE_KEY_PREFIX}_active_restaurant_id`);
+
+      let rList: Restaurant[] = storedRests ? JSON.parse(storedRests) : [DEMO_RESTAURANT];
+      let cList: Category[] = storedCats ? JSON.parse(storedCats) : DEMO_CATEGORIES;
+      let iList: MenuItem[] = storedItms ? JSON.parse(storedItms) : DEMO_ITEMS;
+
+      setAllRestaurants(rList);
+      setAllCategories(cList);
+      setAllItems(iList);
+
       if (cloudAvailable && supabase) {
         // 1. Check Supabase Auth Session
         const { data: sessionData } = await supabase.auth.getSession();
         const authUser = sessionData?.session?.user;
 
         if (authUser) {
-          // Fetch or generate Profile
           const profile: Profile = {
             id: authUser.id,
             email: authUser.email || "",
@@ -234,6 +248,8 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
             updated_at: new Date().toISOString(),
           };
           setUser(profile);
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(profile));
+          localStorage.removeItem(`${STORAGE_KEY_PREFIX}_logged_out`);
 
           // Fetch user's restaurants from Supabase
           const { data: userRests, error: restErr } = await supabase
@@ -242,13 +258,10 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
             .eq("owner_id", authUser.id)
             .order("created_at", { ascending: false });
 
-          if (restErr) {
-            console.error("Failed to load restaurants from Supabase:", restErr);
-          }
-
-          if (userRests && userRests.length > 0) {
+          if (!restErr && userRests && userRests.length > 0) {
             const activeRest = userRests[0] as Restaurant;
             setRestaurant(activeRest);
+            localStorage.setItem(`${STORAGE_KEY_PREFIX}_active_restaurant_id`, activeRest.id);
 
             // Fetch categories for this restaurant
             const { data: catData } = await supabase
@@ -272,33 +285,13 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
             setAllRestaurants(userRests as Restaurant[]);
             setAllCategories(validCats);
             setAllItems(validItems);
-          } else {
-            // User is signed in to Supabase but has no restaurant yet
-            setRestaurant(null);
-            setCategories([]);
-            setItems([]);
+            return;
           }
-          return;
         }
       }
 
       // Offline / LocalStorage Fallback
-      const isExplicitlyLoggedOut = localStorage.getItem(`${STORAGE_KEY_PREFIX}_logged_out`) === "true";
-      const storedUser = localStorage.getItem(`${STORAGE_KEY_PREFIX}_current_user`);
-      const storedRestaurants = localStorage.getItem(`${STORAGE_KEY_PREFIX}_restaurants`);
-      const storedCategories = localStorage.getItem(`${STORAGE_KEY_PREFIX}_categories`);
-      const storedItems = localStorage.getItem(`${STORAGE_KEY_PREFIX}_items`);
-
-      const rList: Restaurant[] = storedRestaurants ? JSON.parse(storedRestaurants) : [DEMO_RESTAURANT];
-      const cList: Category[] = storedCategories ? JSON.parse(storedCategories) : DEMO_CATEGORIES;
-      const iList: MenuItem[] = storedItems ? JSON.parse(storedItems) : DEMO_ITEMS;
-
-      setAllRestaurants(rList);
-      setAllCategories(cList);
-      setAllItems(iList);
-
       if (isExplicitlyLoggedOut) {
-        // User explicitly logged out: do not force demo user!
         setUser(null);
         setRestaurant(null);
         setCategories([]);
@@ -307,20 +300,24 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
         const parsedUser: Profile = JSON.parse(storedUser);
         setUser(parsedUser);
 
-        // Find user's restaurant (pick latest)
-        const userRests = rList.filter((r) => r.owner_id === parsedUser.id);
-        const userRest = userRests.length > 0 ? userRests[userRests.length - 1] : null;
+        // Find user's restaurant
+        let userRest = activeRestId ? rList.find((r) => r.id === activeRestId) : null;
+        if (!userRest) {
+          const userRests = rList.filter((r) => r.owner_id === parsedUser.id);
+          userRest = userRests.length > 0 ? userRests[userRests.length - 1] : null;
+        }
 
-        setRestaurant(userRest);
         if (userRest) {
+          setRestaurant(userRest);
           setCategories(cList.filter((c) => c.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
           setItems(iList.filter((i) => i.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
         } else {
+          setRestaurant(null);
           setCategories([]);
           setItems([]);
         }
       } else {
-        // Default to demo owner initially if never interacted
+        // Default to demo owner initially if never visited
         const defaultOwner: Profile = {
           id: DEMO_OWNER_ID,
           full_name: "Aarav Sharma",
@@ -378,6 +375,15 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (data.user) {
+          const profile: Profile = {
+            id: data.user.id,
+            email: cleanEmail,
+            full_name: data.user.user_metadata?.full_name || cleanEmail.split("@")[0],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          setUser(profile);
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(profile));
           await refreshData();
           return { success: true };
         }
@@ -428,6 +434,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
       persistLocalState(nextR, nextC, nextI, existingUser);
     } else {
       setRestaurant(existingRest);
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}_active_restaurant_id`, existingRest.id);
       setCategories(
         allCategories
           .filter((c) => c.restaurant_id === existingRest.id)
@@ -478,6 +485,16 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
             updated_at: new Date().toISOString(),
           };
           setUser(newProfile);
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(newProfile));
+
+          // Try automatic sign in so session is active immediately
+          if (!data.session && password) {
+            await supabase.auth.signInWithPassword({
+              email: cleanEmail,
+              password: password,
+            });
+          }
+
           setRestaurant(null);
           setCategories([]);
           setItems([]);
@@ -530,6 +547,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     setItems([]);
     localStorage.setItem(`${STORAGE_KEY_PREFIX}_logged_out`, "true");
     localStorage.removeItem(`${STORAGE_KEY_PREFIX}_current_user`);
+    localStorage.removeItem(`${STORAGE_KEY_PREFIX}_active_restaurant_id`);
   };
 
   // Quick switch account for development/demo
@@ -558,6 +576,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
       persistLocalState(nextR, nextC, nextI, newUser);
     } else {
       setRestaurant(existingRest);
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}_active_restaurant_id`, existingRest.id);
       setCategories(
         allCategories
           .filter((c) => c.restaurant_id === existingRest.id)
@@ -573,7 +592,25 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
 
   // Create Restaurant (Cloud + Local)
   const createRestaurant = async (data: Partial<Restaurant>): Promise<Restaurant> => {
-    if (!user) throw new Error("Must be logged in to create restaurant");
+    let activeUser = user;
+    if (!activeUser) {
+      const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}_current_user`);
+      if (stored) {
+        activeUser = JSON.parse(stored);
+        setUser(activeUser);
+      } else {
+        // Create an automatic owner profile so onboarding never fails
+        activeUser = {
+          id: `user-${Date.now()}`,
+          full_name: "Restaurant Owner",
+          email: "owner@menumint.in",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setUser(activeUser);
+        localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(activeUser));
+      }
+    }
 
     const baseSlug = generateSlug(data.name || "my-restaurant");
     let slug = baseSlug;
@@ -583,7 +620,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     }
 
     const newRestData: Partial<Restaurant> = {
-      owner_id: user.id,
+      owner_id: activeUser!.id,
       name: data.name || "My Restaurant",
       slug: data.slug ? generateSlug(data.slug) : slug,
       description: data.description || "",
@@ -604,6 +641,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
       published: data.published ?? true,
     };
 
+    // Try Supabase insert if cloud configured
     const supabase = getSupabaseBrowserClient();
     if (isSupabaseConfigured() && supabase) {
       try {
@@ -613,13 +651,20 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
           .select()
           .single();
 
-        if (error) throw error;
-        const createdRest = created as Restaurant;
-        setRestaurant(createdRest);
-        setAllRestaurants((prev) => [createdRest, ...prev]);
-        return createdRest;
+        if (!error && created) {
+          const createdRest = created as Restaurant;
+          setRestaurant(createdRest);
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}_active_restaurant_id`, createdRest.id);
+
+          const storedRests = localStorage.getItem(`${STORAGE_KEY_PREFIX}_restaurants`);
+          const currentRests: Restaurant[] = storedRests ? JSON.parse(storedRests) : [];
+          const nextRests = [createdRest, ...currentRests.filter((r) => r.id !== createdRest.id)];
+          localStorage.setItem(`${STORAGE_KEY_PREFIX}_restaurants`, JSON.stringify(nextRests));
+          setAllRestaurants(nextRests);
+          return createdRest;
+        }
       } catch (err) {
-        console.error("Failed to insert restaurant in Supabase, falling back to local:", err);
+        console.error("Supabase createRestaurant error:", err);
       }
     }
 
@@ -631,11 +676,14 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
       updated_at: new Date().toISOString(),
     } as Restaurant;
 
-    // Replace any previous starter restaurant for this user so no conflicts occur
-    const filteredRestaurants = allRestaurants.filter((r) => r.owner_id !== user.id);
+    const storedRests = localStorage.getItem(`${STORAGE_KEY_PREFIX}_restaurants`);
+    const currentRests: Restaurant[] = storedRests ? JSON.parse(storedRests) : allRestaurants;
+    const filteredRestaurants = currentRests.filter((r) => r.owner_id !== activeUser!.id);
     const nextRestaurants = [...filteredRestaurants, localRest];
-    persistLocalState(nextRestaurants, allCategories, allItems, user);
+
+    persistLocalState(nextRestaurants, allCategories, allItems, activeUser);
     setRestaurant(localRest);
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}_active_restaurant_id`, localRest.id);
     return localRest;
   };
 
@@ -693,36 +741,8 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     description?: string,
     targetRestaurantId?: string
   ): Promise<Category> => {
-    const targetId = targetRestaurantId || restaurant?.id;
+    const targetId = targetRestaurantId || restaurant?.id || restaurantRef.current?.id;
     if (!targetId) throw new Error("No restaurant active");
-
-    const categoryData: Partial<Category> = {
-      restaurant_id: targetId,
-      name: name.trim(),
-      description: description?.trim() || null,
-      position: categories.length,
-      is_visible: true,
-    };
-
-    const supabase = getSupabaseBrowserClient();
-    if (isSupabaseConfigured() && supabase) {
-      try {
-        const { data: created, error } = await supabase
-          .from("categories")
-          .insert(categoryData)
-          .select()
-          .single();
-
-        if (!error && created) {
-          const newCat = created as Category;
-          setCategories((prev) => [...prev, newCat]);
-          setAllCategories((prev) => [...prev, newCat]);
-          return newCat;
-        }
-      } catch (err) {
-        console.error("Supabase addCategory error:", err);
-      }
-    }
 
     const newCategory: Category = {
       id: `cat-${Date.now()}`,
@@ -735,8 +755,31 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
       updated_at: new Date().toISOString(),
     };
 
-    const nextCategories = [...allCategories, newCategory];
-    persistLocalState(allRestaurants, nextCategories, allItems);
+    // Update state immediately
+    setCategories((prev) => [...prev, newCategory]);
+    setAllCategories((prev) => [...prev, newCategory]);
+
+    // Save to localStorage without wiping restaurants
+    const storedCats = localStorage.getItem(`${STORAGE_KEY_PREFIX}_categories`);
+    const currentCats: Category[] = storedCats ? JSON.parse(storedCats) : allCategories;
+    const nextCategories = [...currentCats.filter((c) => c.id !== newCategory.id), newCategory];
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}_categories`, JSON.stringify(nextCategories));
+
+    const supabase = getSupabaseBrowserClient();
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await supabase.from("categories").insert({
+          restaurant_id: targetId,
+          name: name.trim(),
+          description: description?.trim() || null,
+          position: categories.length,
+          is_visible: true,
+        });
+      } catch (err) {
+        console.error("Supabase addCategory error:", err);
+      }
+    }
+
     return newCategory;
   };
 
@@ -757,7 +800,9 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     const nextCategories = allCategories.map((c) =>
       c.id === id ? { ...c, ...updates, updated_at: new Date().toISOString() } : c
     );
-    persistLocalState(allRestaurants, nextCategories, allItems);
+    setCategories(nextCategories.filter((c) => c.restaurant_id === restaurant?.id));
+    setAllCategories(nextCategories);
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}_categories`, JSON.stringify(nextCategories));
   };
 
   // Delete Category
@@ -773,7 +818,12 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
 
     const nextCategories = allCategories.filter((c) => c.id !== id);
     const nextItems = allItems.filter((i) => i.category_id !== id);
-    persistLocalState(allRestaurants, nextCategories, nextItems);
+    setCategories(nextCategories.filter((c) => c.restaurant_id === restaurant?.id));
+    setAllCategories(nextCategories);
+    setItems(nextItems.filter((i) => i.restaurant_id === restaurant?.id));
+    setAllItems(nextItems);
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}_categories`, JSON.stringify(nextCategories));
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}_items`, JSON.stringify(nextItems));
   };
 
   // Move Category
@@ -789,10 +839,14 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     newCategories.splice(targetIndex, 0, moved);
 
     const reindexed = newCategories.map((c, idx) => ({ ...c, position: idx }));
+    setCategories(reindexed);
+
     const nextCategories = allCategories.map((c) => {
       const match = reindexed.find((r) => r.id === c.id);
       return match || c;
     });
+    setAllCategories(nextCategories);
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}_categories`, JSON.stringify(nextCategories));
 
     const supabase = getSupabaseBrowserClient();
     if (isSupabaseConfigured() && supabase) {
@@ -800,8 +854,6 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
         supabase.from("categories").update({ position: cat.position }).eq("id", cat.id);
       }
     }
-
-    persistLocalState(allRestaurants, nextCategories, allItems);
   };
 
   // Add Item
@@ -809,36 +861,10 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     itemData: Omit<MenuItem, "id" | "restaurant_id" | "position" | "created_at" | "updated_at">,
     targetRestaurantId?: string
   ): Promise<MenuItem> => {
-    const targetId = targetRestaurantId || restaurant?.id;
+    const targetId = targetRestaurantId || restaurant?.id || restaurantRef.current?.id;
     if (!targetId) throw new Error("No restaurant active");
 
     const categoryItems = items.filter((i) => i.category_id === itemData.category_id);
-    const newItemData: Partial<MenuItem> = {
-      ...itemData,
-      restaurant_id: targetId,
-      position: categoryItems.length,
-    };
-
-    const supabase = getSupabaseBrowserClient();
-    if (isSupabaseConfigured() && supabase) {
-      try {
-        const { data: created, error } = await supabase
-          .from("menu_items")
-          .insert(newItemData)
-          .select()
-          .single();
-
-        if (!error && created) {
-          const newItem = created as MenuItem;
-          setItems((prev) => [...prev, newItem]);
-          setAllItems((prev) => [...prev, newItem]);
-          return newItem;
-        }
-      } catch (err) {
-        console.error("Supabase addItem error:", err);
-      }
-    }
-
     const newItem: MenuItem = {
       ...itemData,
       id: `item-${Date.now()}`,
@@ -848,8 +874,27 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
       updated_at: new Date().toISOString(),
     };
 
-    const nextItems = [...allItems, newItem];
-    persistLocalState(allRestaurants, allCategories, nextItems);
+    setItems((prev) => [...prev, newItem]);
+    setAllItems((prev) => [...prev, newItem]);
+
+    const storedItems = localStorage.getItem(`${STORAGE_KEY_PREFIX}_items`);
+    const currentItems: MenuItem[] = storedItems ? JSON.parse(storedItems) : allItems;
+    const nextItems = [...currentItems.filter((i) => i.id !== newItem.id), newItem];
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}_items`, JSON.stringify(nextItems));
+
+    const supabase = getSupabaseBrowserClient();
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await supabase.from("menu_items").insert({
+          ...itemData,
+          restaurant_id: targetId,
+          position: categoryItems.length,
+        });
+      } catch (err) {
+        console.error("Supabase addItem error:", err);
+      }
+    }
+
     return newItem;
   };
 
@@ -870,7 +915,9 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     const nextItems = allItems.map((i) =>
       i.id === id ? { ...i, ...updates, updated_at: new Date().toISOString() } : i
     );
-    persistLocalState(allRestaurants, allCategories, nextItems);
+    setItems(nextItems.filter((i) => i.restaurant_id === restaurant?.id));
+    setAllItems(nextItems);
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}_items`, JSON.stringify(nextItems));
   };
 
   // Delete Item
@@ -885,7 +932,9 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     }
 
     const nextItems = allItems.filter((i) => i.id !== id);
-    persistLocalState(allRestaurants, allCategories, nextItems);
+    setItems(nextItems.filter((i) => i.restaurant_id === restaurant?.id));
+    setAllItems(nextItems);
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}_items`, JSON.stringify(nextItems));
   };
 
   // Duplicate Item
@@ -926,10 +975,14 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     newItems.splice(targetIndex, 0, moved);
 
     const reindexed = newItems.map((i, idx) => ({ ...i, position: idx }));
+    setItems(reindexed);
+
     const nextItems = allItems.map((i) => {
       const match = reindexed.find((r) => r.id === i.id);
       return match || i;
     });
+    setAllItems(nextItems);
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}_items`, JSON.stringify(nextItems));
 
     const supabase = getSupabaseBrowserClient();
     if (isSupabaseConfigured() && supabase) {
@@ -937,8 +990,6 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
         supabase.from("menu_items").update({ position: it.position }).eq("id", it.id);
       }
     }
-
-    persistLocalState(allRestaurants, allCategories, nextItems);
   };
 
   const toggleItemAvailability = async (id: string) => {
@@ -956,7 +1007,10 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
   // Public retrieval (local store lookup for preview/fallback)
   const getPublicRestaurant = (slug: string): FullRestaurantData | null => {
     const cleanSlug = slug.toLowerCase().trim();
-    const r = allRestaurants.find((item) => item.slug.toLowerCase() === cleanSlug);
+    const storedRests = typeof window !== "undefined" ? localStorage.getItem(`${STORAGE_KEY_PREFIX}_restaurants`) : null;
+    const rList: Restaurant[] = storedRests ? JSON.parse(storedRests) : allRestaurants;
+
+    const r = rList.find((item) => item.slug.toLowerCase() === cleanSlug);
     if (!r) {
       if (cleanSlug === DEMO_RESTAURANT.slug.toLowerCase()) {
         return {
@@ -972,11 +1026,16 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
       return null;
     }
 
-    const restCategories = allCategories
+    const storedCats = typeof window !== "undefined" ? localStorage.getItem(`${STORAGE_KEY_PREFIX}_categories`) : null;
+    const cList: Category[] = storedCats ? JSON.parse(storedCats) : allCategories;
+    const storedItms = typeof window !== "undefined" ? localStorage.getItem(`${STORAGE_KEY_PREFIX}_items`) : null;
+    const iList: MenuItem[] = storedItms ? JSON.parse(storedItms) : allItems;
+
+    const restCategories = cList
       .filter((c) => c.restaurant_id === r.id && c.is_visible)
       .sort((a, b) => a.position - b.position)
       .map((cat) => {
-        const catItems = allItems
+        const catItems = iList
           .filter((i) => i.category_id === cat.id && i.is_visible)
           .sort((a, b) => a.position - b.position);
         return {
