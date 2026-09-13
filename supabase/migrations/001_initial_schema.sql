@@ -19,10 +19,12 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 CREATE POLICY "Users can view own profile"
   ON public.profiles FOR SELECT
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 CREATE POLICY "Users can update own profile"
   ON public.profiles FOR UPDATE
   USING (auth.uid() = id);
@@ -61,20 +63,23 @@ CREATE INDEX IF NOT EXISTS idx_restaurants_published ON public.restaurants(publi
 
 ALTER TABLE public.restaurants ENABLE ROW LEVEL SECURITY;
 
--- Owners can view their own restaurants; anyone can view published restaurants
+DROP POLICY IF EXISTS "Public can view published restaurants" ON public.restaurants;
 CREATE POLICY "Public can view published restaurants"
   ON public.restaurants FOR SELECT
   USING (published = true OR auth.uid() = owner_id);
 
+DROP POLICY IF EXISTS "Owners can insert their restaurants" ON public.restaurants;
 CREATE POLICY "Owners can insert their restaurants"
   ON public.restaurants FOR INSERT
   WITH CHECK (auth.uid() = owner_id);
 
+DROP POLICY IF EXISTS "Owners can update their restaurants" ON public.restaurants;
 CREATE POLICY "Owners can update their restaurants"
   ON public.restaurants FOR UPDATE
   USING (auth.uid() = owner_id)
   WITH CHECK (auth.uid() = owner_id);
 
+DROP POLICY IF EXISTS "Owners can delete their restaurants" ON public.restaurants;
 CREATE POLICY "Owners can delete their restaurants"
   ON public.restaurants FOR DELETE
   USING (auth.uid() = owner_id);
@@ -98,7 +103,7 @@ CREATE INDEX IF NOT EXISTS idx_categories_position ON public.categories(restaura
 
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 
--- Public can view categories of published restaurants; owner can view all
+DROP POLICY IF EXISTS "Public can view published restaurant categories" ON public.categories;
 CREATE POLICY "Public can view published restaurant categories"
   ON public.categories FOR SELECT
   USING (
@@ -109,6 +114,7 @@ CREATE POLICY "Public can view published restaurant categories"
     )
   );
 
+DROP POLICY IF EXISTS "Owners can insert categories" ON public.categories;
 CREATE POLICY "Owners can insert categories"
   ON public.categories FOR INSERT
   WITH CHECK (
@@ -119,6 +125,7 @@ CREATE POLICY "Owners can insert categories"
     )
   );
 
+DROP POLICY IF EXISTS "Owners can update categories" ON public.categories;
 CREATE POLICY "Owners can update categories"
   ON public.categories FOR UPDATE
   USING (
@@ -129,6 +136,7 @@ CREATE POLICY "Owners can update categories"
     )
   );
 
+DROP POLICY IF EXISTS "Owners can delete categories" ON public.categories;
 CREATE POLICY "Owners can delete categories"
   ON public.categories FOR DELETE
   USING (
@@ -168,6 +176,7 @@ CREATE INDEX IF NOT EXISTS idx_menu_items_food_type ON public.menu_items(food_ty
 
 ALTER TABLE public.menu_items ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Public can view published restaurant items" ON public.menu_items;
 CREATE POLICY "Public can view published restaurant items"
   ON public.menu_items FOR SELECT
   USING (
@@ -178,6 +187,7 @@ CREATE POLICY "Public can view published restaurant items"
     )
   );
 
+DROP POLICY IF EXISTS "Owners can insert items" ON public.menu_items;
 CREATE POLICY "Owners can insert items"
   ON public.menu_items FOR INSERT
   WITH CHECK (
@@ -188,6 +198,7 @@ CREATE POLICY "Owners can insert items"
     )
   );
 
+DROP POLICY IF EXISTS "Owners can update items" ON public.menu_items;
 CREATE POLICY "Owners can update items"
   ON public.menu_items FOR UPDATE
   USING (
@@ -198,6 +209,7 @@ CREATE POLICY "Owners can update items"
     )
   );
 
+DROP POLICY IF EXISTS "Owners can delete items" ON public.menu_items;
 CREATE POLICY "Owners can delete items"
   ON public.menu_items FOR DELETE
   USING (
@@ -223,10 +235,12 @@ CREATE INDEX IF NOT EXISTS idx_menu_views_restaurant ON public.menu_views(restau
 
 ALTER TABLE public.menu_views ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Anyone can record a view" ON public.menu_views;
 CREATE POLICY "Anyone can record a view"
   ON public.menu_views FOR INSERT
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Owners can read their restaurant views" ON public.menu_views;
 CREATE POLICY "Owners can read their restaurant views"
   ON public.menu_views FOR SELECT
   USING (
@@ -248,18 +262,14 @@ BEGIN
     new.id,
     COALESCE(new.raw_user_meta_data->>'full_name', 'Restaurant Owner'),
     new.email
-  );
+  )
+  ON CONFLICT (id) DO UPDATE
+  SET full_name = EXCLUDED.full_name, email = EXCLUDED.email;
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE TRIGGER on_auth_user_created
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
--- ------------------------------------------------------------------------------
--- 7. Storage Bucket Setup (Run in Supabase SQL editor)
--- ------------------------------------------------------------------------------
--- INSERT INTO storage.buckets (id, name, public) VALUES ('restaurant-assets', 'restaurant-assets', true);
--- CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'restaurant-assets');
--- CREATE POLICY "Authenticated users can upload images" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'restaurant-assets' AND auth.role() = 'authenticated');
