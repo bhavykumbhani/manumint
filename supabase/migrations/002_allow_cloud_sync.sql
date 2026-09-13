@@ -5,8 +5,10 @@
 -- instantly across all devices without email confirmation bottlenecks.
 -- ==============================================================================
 
--- 1. Make owner_id flexible so restaurants can be created immediately
+-- 1. Make owner_id flexible and add owner_email for strict multi-tenant isolation
 ALTER TABLE public.restaurants DROP CONSTRAINT IF EXISTS restaurants_owner_id_fkey;
+ALTER TABLE public.restaurants ADD COLUMN IF NOT EXISTS owner_email TEXT;
+CREATE INDEX IF NOT EXISTS idx_restaurants_owner_email ON public.restaurants(owner_email);
 
 -- 2. Restaurant Policies
 DROP POLICY IF EXISTS "Public can view published restaurants" ON public.restaurants;

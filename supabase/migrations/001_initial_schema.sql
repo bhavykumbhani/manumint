@@ -35,6 +35,7 @@ CREATE POLICY "Users can update own profile"
 CREATE TABLE IF NOT EXISTS public.restaurants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id UUID NOT NULL,
+  owner_email TEXT,
   name TEXT NOT NULL,
   slug TEXT UNIQUE NOT NULL,
   description TEXT,

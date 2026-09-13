@@ -67,6 +67,7 @@ function createStarterRestaurantForUser(user: Profile): {
   const newRest: Restaurant = {
     id: restId,
     owner_id: user.id,
+    owner_email: user.email.toLowerCase().trim(),
     name: restName,
     slug: restSlug,
     description: `Welcome to ${restName}! Explore our chef-crafted menu.`,
@@ -413,18 +414,25 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(confirmedProfile));
 
             try {
+              // STRICT MULTI-TENANT ISOLATION: Query ONLY this owner's restaurant by email or id
               const { data: cloudRests } = await supabase
                 .from("restaurants")
                 .select("*")
+                .or(`owner_email.eq.${cleanEmail},owner_id.eq.${confirmedProfile.id}`)
                 .order("created_at", { ascending: false });
 
               const storedRests = localStorage.getItem(`${STORAGE_KEY_PREFIX}_restaurants`);
-              const rList: Restaurant[] = cloudRests && cloudRests.length > 0
-                ? (cloudRests as Restaurant[])
-                : storedRests ? JSON.parse(storedRests) : allRestaurants;
+              const allStored: Restaurant[] = storedRests ? JSON.parse(storedRests) : allRestaurants;
+              const localMatched = allStored.filter(
+                (r) => (r.owner_email && r.owner_email.toLowerCase() === cleanEmail) || r.owner_id === confirmedProfile.id
+              );
 
-              if (rList.length > 0) {
-                const matchedRest = rList[0];
+              const userRests = cloudRests && cloudRests.length > 0
+                ? (cloudRests as Restaurant[])
+                : localMatched;
+
+              if (userRests.length > 0) {
+                const matchedRest = userRests[0];
                 setRestaurant(matchedRest);
                 localStorage.setItem(`${STORAGE_KEY_PREFIX}_active_restaurant_id`, matchedRest.id);
 
@@ -433,9 +441,16 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
 
                 if (catData && catData.length > 0) setCategories(catData as Category[]);
                 if (itemData && itemData.length > 0) setItems(itemData as MenuItem[]);
+              } else {
+                // New owner without a restaurant yet -> route them to create their own!
+                setRestaurant(null);
+                setCategories([]);
+                setItems([]);
               }
             } catch {
-              // fallback
+              setRestaurant(null);
+              setCategories([]);
+              setItems([]);
             }
 
             return { success: true };
@@ -736,6 +751,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     const newRestData: Partial<Restaurant> = {
       id: newRestId,
       owner_id: activeUser!.id,
+      owner_email: activeUser!.email.toLowerCase().trim(),
       name: data.name || "My Restaurant",
       slug: data.slug ? generateSlug(data.slug) : slug,
       description: data.description || "",

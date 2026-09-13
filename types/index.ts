@@ -13,6 +13,7 @@ export interface Profile {
 export interface Restaurant {
   id: string;
   owner_id: string;
+  owner_email?: string | null;
   name: string;
   slug: string;
   description: string | null;
