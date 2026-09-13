@@ -14,8 +14,10 @@ function getSupabaseUrl(): string | undefined {
 function getSupabaseAnonKey(): string | undefined {
   return (
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
     process.env.NEXT_PUBLIC_STORAGE_ANON_KEY ||
     process.env.SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
     process.env.STORAGE_ANON_KEY
   );
 }
