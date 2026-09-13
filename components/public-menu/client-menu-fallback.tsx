@@ -1,17 +1,94 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useMenuStore } from "@/lib/store";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { Category, FullRestaurantData, MenuItem, Restaurant } from "@/types";
 import { PublicMenuView } from "@/components/public-menu/public-menu-view";
 import { UtensilsCrossed, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function ClientMenuFallback({ slug }: { slug: string }) {
-  const { getPublicRestaurant, isLoading } = useMenuStore();
-  const data = getPublicRestaurant(slug);
+  const { getPublicRestaurant, isLoading: storeLoading } = useMenuStore();
+  const [cloudData, setCloudData] = useState<FullRestaurantData | null>(null);
+  const [isFetchingCloud, setIsFetchingCloud] = useState(true);
 
-  if (isLoading) {
+  const localData = getPublicRestaurant(slug);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchFromSupabase() {
+      if (localData) {
+        setIsFetchingCloud(false);
+        return;
+      }
+
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) {
+        setIsFetchingCloud(false);
+        return;
+      }
+
+      try {
+        const cleanSlug = slug.toLowerCase().trim();
+        const { data: rest, error: restError } = await supabase
+          .from("restaurants")
+          .select("*")
+          .ilike("slug", cleanSlug)
+          .maybeSingle();
+
+        if (restError || !rest) {
+          if (isMounted) setIsFetchingCloud(false);
+          return;
+        }
+
+        const { data: cats } = await supabase
+          .from("categories")
+          .select("*")
+          .eq("restaurant_id", rest.id)
+          .eq("is_visible", true)
+          .order("position", { ascending: true });
+
+        const { data: itms } = await supabase
+          .from("menu_items")
+          .select("*")
+          .eq("restaurant_id", rest.id)
+          .eq("is_visible", true)
+          .order("position", { ascending: true });
+
+        const validCats = (cats as Category[]) || [];
+        const validItms = (itms as MenuItem[]) || [];
+
+        const fullCats = validCats.map((c) => ({
+          ...c,
+          items: validItms.filter((i) => i.category_id === c.id).sort((a, b) => a.position - b.position),
+        }));
+
+        if (isMounted) {
+          setCloudData({
+            restaurant: rest as Restaurant,
+            categories: fullCats,
+          });
+        }
+      } catch (e) {
+        console.error("ClientMenuFallback error:", e);
+      } finally {
+        if (isMounted) setIsFetchingCloud(false);
+      }
+    }
+
+    fetchFromSupabase();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [slug, localData]);
+
+  const activeData = localData || cloudData;
+
+  if (storeLoading || (isFetchingCloud && !activeData)) {
     return (
       <div className="min-h-screen bg-white dark:bg-zinc-950 flex flex-col items-center justify-center p-4">
         <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4" />
@@ -20,7 +97,7 @@ export function ClientMenuFallback({ slug }: { slug: string }) {
     );
   }
 
-  if (!data) {
+  if (!activeData) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-6 text-center">
         <div className="w-16 h-16 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-400 mb-4">
@@ -40,5 +117,5 @@ export function ClientMenuFallback({ slug }: { slug: string }) {
     );
   }
 
-  return <PublicMenuView data={data} />;
+  return <PublicMenuView data={activeData} />;
 }

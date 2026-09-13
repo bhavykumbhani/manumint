@@ -3,21 +3,26 @@ import { isSupabaseConfigured } from "./client";
 import { Category, FullRestaurantData, MenuItem, Restaurant } from "@/types";
 import { DEMO_CATEGORIES, DEMO_ITEMS, DEMO_RESTAURANT } from "@/lib/demo-data";
 
+const DEFAULT_SUPABASE_URL = "https://xjfuibpselnkdbpeguhq.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_Gxc6QxRuNs7983ppZonz1w_nLCfd2bO";
+
 function getPublicClient() {
   const url =
     process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.NEXT_PUBLIC_STORAGE_URL ||
     process.env.SUPABASE_URL ||
-    process.env.STORAGE_URL;
+    process.env.STORAGE_URL ||
+    DEFAULT_SUPABASE_URL;
   const key =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
     process.env.NEXT_PUBLIC_STORAGE_ANON_KEY ||
     process.env.SUPABASE_ANON_KEY ||
     process.env.SUPABASE_PUBLISHABLE_KEY ||
-    process.env.STORAGE_ANON_KEY;
+    process.env.STORAGE_ANON_KEY ||
+    DEFAULT_SUPABASE_ANON_KEY;
 
-  if (!url || !key || !isSupabaseConfigured()) {
+  if (!url || !key) {
     return null;
   }
 
@@ -42,7 +47,7 @@ export async function getPublicRestaurantBySlug(slug: string): Promise<FullResta
       const { data: restaurant, error: restError } = await client
         .from("restaurants")
         .select("*")
-        .eq("slug", cleanSlug)
+        .ilike("slug", cleanSlug)
         .maybeSingle();
 
       if (restError) {

@@ -34,7 +34,7 @@ CREATE POLICY "Users can update own profile"
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.restaurants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  owner_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  owner_id UUID NOT NULL,
   name TEXT NOT NULL,
   slug TEXT UNIQUE NOT NULL,
   description TEXT,
@@ -66,23 +66,22 @@ ALTER TABLE public.restaurants ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public can view published restaurants" ON public.restaurants;
 CREATE POLICY "Public can view published restaurants"
   ON public.restaurants FOR SELECT
-  USING (published = true OR auth.uid() = owner_id);
+  USING (true);
 
 DROP POLICY IF EXISTS "Owners can insert their restaurants" ON public.restaurants;
 CREATE POLICY "Owners can insert their restaurants"
   ON public.restaurants FOR INSERT
-  WITH CHECK (auth.uid() = owner_id);
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Owners can update their restaurants" ON public.restaurants;
 CREATE POLICY "Owners can update their restaurants"
   ON public.restaurants FOR UPDATE
-  USING (auth.uid() = owner_id)
-  WITH CHECK (auth.uid() = owner_id);
+  USING (true);
 
 DROP POLICY IF EXISTS "Owners can delete their restaurants" ON public.restaurants;
 CREATE POLICY "Owners can delete their restaurants"
   ON public.restaurants FOR DELETE
-  USING (auth.uid() = owner_id);
+  USING (true);
 
 -- ------------------------------------------------------------------------------
 -- 3. Categories Table
@@ -106,46 +105,22 @@ ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public can view published restaurant categories" ON public.categories;
 CREATE POLICY "Public can view published restaurant categories"
   ON public.categories FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.restaurants r
-      WHERE r.id = categories.restaurant_id
-      AND (r.published = true OR r.owner_id = auth.uid())
-    )
-  );
+  USING (true);
 
 DROP POLICY IF EXISTS "Owners can insert categories" ON public.categories;
 CREATE POLICY "Owners can insert categories"
   ON public.categories FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.restaurants r
-      WHERE r.id = categories.restaurant_id
-      AND r.owner_id = auth.uid()
-    )
-  );
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Owners can update categories" ON public.categories;
 CREATE POLICY "Owners can update categories"
   ON public.categories FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.restaurants r
-      WHERE r.id = categories.restaurant_id
-      AND r.owner_id = auth.uid()
-    )
-  );
+  USING (true);
 
 DROP POLICY IF EXISTS "Owners can delete categories" ON public.categories;
 CREATE POLICY "Owners can delete categories"
   ON public.categories FOR DELETE
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.restaurants r
-      WHERE r.id = categories.restaurant_id
-      AND r.owner_id = auth.uid()
-    )
-  );
+  USING (true);
 
 -- ------------------------------------------------------------------------------
 -- 4. Menu Items Table
@@ -179,46 +154,22 @@ ALTER TABLE public.menu_items ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public can view published restaurant items" ON public.menu_items;
 CREATE POLICY "Public can view published restaurant items"
   ON public.menu_items FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.restaurants r
-      WHERE r.id = menu_items.restaurant_id
-      AND (r.published = true OR r.owner_id = auth.uid())
-    )
-  );
+  USING (true);
 
 DROP POLICY IF EXISTS "Owners can insert items" ON public.menu_items;
 CREATE POLICY "Owners can insert items"
   ON public.menu_items FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.restaurants r
-      WHERE r.id = menu_items.restaurant_id
-      AND r.owner_id = auth.uid()
-    )
-  );
+  WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Owners can update items" ON public.menu_items;
 CREATE POLICY "Owners can update items"
   ON public.menu_items FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.restaurants r
-      WHERE r.id = menu_items.restaurant_id
-      AND r.owner_id = auth.uid()
-    )
-  );
+  USING (true);
 
 DROP POLICY IF EXISTS "Owners can delete items" ON public.menu_items;
 CREATE POLICY "Owners can delete items"
   ON public.menu_items FOR DELETE
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.restaurants r
-      WHERE r.id = menu_items.restaurant_id
-      AND r.owner_id = auth.uid()
-    )
-  );
+  USING (true);
 
 -- ------------------------------------------------------------------------------
 -- 5. Menu Views (Analytics)
