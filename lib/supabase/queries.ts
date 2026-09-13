@@ -4,8 +4,16 @@ import { Category, FullRestaurantData, MenuItem, Restaurant } from "@/types";
 import { DEMO_CATEGORIES, DEMO_ITEMS, DEMO_RESTAURANT } from "@/lib/demo-data";
 
 function getPublicClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_STORAGE_URL ||
+    process.env.SUPABASE_URL ||
+    process.env.STORAGE_URL;
+  const key =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_STORAGE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.STORAGE_ANON_KEY;
 
   if (!url || !key || !isSupabaseConfigured()) {
     return null;
