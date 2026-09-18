@@ -25,6 +25,8 @@ import {
   EyeOff,
   Smartphone,
   SlidersHorizontal,
+  Search,
+  X,
 } from "lucide-react";
 
 export function MenuBuilderView() {
@@ -48,6 +50,8 @@ export function MenuBuilderView() {
 
   const [mobileTab, setMobileTab] = useState<"editor" | "preview">("editor");
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
 
   // Modals state
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
@@ -172,6 +176,60 @@ export function MenuBuilderView() {
             </Button>
           </div>
 
+          {/* Quick Search & Category Filter Toolbar */}
+          {categories.length > 0 && (
+            <div className="space-y-2.5">
+              <div className="relative">
+                <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search dishes by name or description..."
+                  className="w-full pl-10 pr-10 py-2.5 text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none shadow-xs text-zinc-900 dark:text-zinc-100"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Category Filter Chips */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                <button
+                  onClick={() => setCategoryFilter("all")}
+                  className={`px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                    categoryFilter === "all"
+                      ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs"
+                      : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50"
+                  }`}
+                >
+                  All ({items.length})
+                </button>
+                {categories.map((c) => {
+                  const catItemCount = items.filter((i) => i.category_id === c.id).length;
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => setCategoryFilter(c.id)}
+                      className={`px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                        categoryFilter === c.id
+                          ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-xs"
+                          : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50"
+                      }`}
+                    >
+                      {c.name} ({catItemCount})
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Categories List */}
           {categories.length === 0 ? (
             <div className="bg-white dark:bg-zinc-900 rounded-2xl p-12 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800">
@@ -193,10 +251,24 @@ export function MenuBuilderView() {
           ) : (
             <div className="space-y-4">
               {categories.map((category, catIndex) => {
+                if (categoryFilter !== "all" && category.id !== categoryFilter) {
+                  return null;
+                }
+
                 const categoryItems = items
                   .filter((i) => i.category_id === category.id)
+                  .filter((i) => {
+                    if (!searchQuery.trim()) return true;
+                    const q = searchQuery.toLowerCase().trim();
+                    return i.name.toLowerCase().includes(q) || i.description?.toLowerCase().includes(q);
+                  })
                   .sort((a, b) => a.position - b.position);
-                const isCollapsed = collapsedCategories[category.id];
+
+                if (searchQuery.trim() && categoryItems.length === 0) {
+                  return null;
+                }
+
+                const isCollapsed = Boolean(collapsedCategories[category.id] && !searchQuery.trim());
 
                 return (
                   <div

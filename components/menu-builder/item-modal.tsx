@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Category, FoodType, MenuItem } from "@/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { FoodIndicator } from "@/components/ui/food-indicator";
 import { useMenuStore } from "@/lib/store";
+import { Upload, Image as ImageIcon, Trash2 } from "lucide-react";
 
 interface ItemModalProps {
   isOpen: boolean;
@@ -27,12 +28,14 @@ export function ItemModal({
 }: ItemModalProps) {
   const { restaurant } = useMenuStore();
   const isPureVeg = restaurant?.dietary_type === "pure_veg";
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
   const [price, setPrice] = useState<string>("");
   const [categoryId, setCategoryId] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [foodType, setFoodType] = useState<FoodType>("veg");
   const [isAvailable, setIsAvailable] = useState(true);
   const [isVisible, setIsVisible] = useState(true);
@@ -42,6 +45,29 @@ export function ItemModal({
   const [isJain, setIsJain] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image size should be under 5MB");
+      return;
+    }
+
+    setIsUploadingImage(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      setImageUrl(dataUrl);
+      setIsUploadingImage(false);
+    };
+    reader.onerror = () => {
+      setError("Failed to process image file");
+      setIsUploadingImage(false);
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     if (item) {
@@ -72,7 +98,7 @@ export function ItemModal({
       setIsJain(false);
     }
     setError(null);
-  }, [item, isOpen, initialCategoryId, categories]);
+  }, [item, isOpen, initialCategoryId, categories, isPureVeg]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,18 +280,77 @@ export function ItemModal({
           />
         </div>
 
-        {/* Image URL / Photo */}
-        <div>
-          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-            Photo URL (Optional)
+        {/* Dish Photo (File Upload + URL Option) */}
+        <div className="space-y-2">
+          <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+            Dish Photo (Optional)
           </label>
+
+          {/* Hidden File Input */}
           <input
-            type="url"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="https://images.unsplash.com/..."
-            className="w-full px-3.5 py-2 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            onChange={handleImageFileChange}
+            className="hidden"
           />
+
+          {imageUrl ? (
+            <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700">
+              <div className="w-16 h-16 rounded-xl overflow-hidden bg-zinc-200 dark:bg-zinc-700 shrink-0 border border-zinc-300 dark:border-zinc-600 relative">
+                <img
+                  src={imageUrl}
+                  alt="Dish preview"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate">
+                  Photo Selected
+                </p>
+                <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                  ✓ Ready for menu display
+                </p>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-[11px] font-semibold text-emerald-600 hover:underline"
+                  >
+                    Change Photo
+                  </button>
+                  <span className="text-zinc-300 dark:text-zinc-600">•</span>
+                  <button
+                    type="button"
+                    onClick={() => setImageUrl("")}
+                    className="text-[11px] font-semibold text-rose-500 hover:underline flex items-center gap-0.5"
+                  >
+                    <Trash2 className="w-3 h-3" /> Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingImage}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-dashed border-emerald-500/70 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center justify-center gap-2 hover:bg-emerald-100/50 transition-colors"
+              >
+                <Upload className="w-4 h-4" />
+                {isUploadingImage ? "Processing..." : "Upload from Device / Camera"}
+              </button>
+              <span className="text-[11px] text-zinc-400">or paste URL:</span>
+              <input
+                type="url"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://..."
+                className="flex-1 w-full px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              />
+            </div>
+          )}
         </div>
 
         {/* Dietary & Status Toggles */}

@@ -48,7 +48,11 @@ export default function DashboardLayout({
           ? (localStorage.getItem("manumaker_v1_restaurants") || localStorage.getItem("menumint_v1_restaurants"))
           : null;
         const rList = storedRests ? JSON.parse(storedRests) : [];
-        const hasRestaurant = rList.some((r: any) => r.owner_id === user.id || r.owner_id);
+        const hasRestaurant = rList.some(
+          (r: any) =>
+            r.owner_id === user.id ||
+            (r.owner_email && user.email && r.owner_email.toLowerCase() === user.email.toLowerCase())
+        );
         if (!hasRestaurant) {
           router.push("/onboarding");
         }

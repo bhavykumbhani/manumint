@@ -119,3 +119,30 @@ body {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
+
+/* Printable Standee Styles */
+@media print {
+  /* Hide all dashboard UI, sidebars, headers, and buttons */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Make printable standee and all its children visible */
+  #printable-standee,
+  #printable-standee * {
+    visibility: visible !important;
+  }
+
+  /* Center the standee on printed page with crisp presentation */
+  #printable-standee {
+    position: fixed !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) scale(1.15) !important;
+    box-shadow: none !important;
+    border: 2px solid #71717a !important;
+    background: #ffffff !important;
+    color: #09090b !important;
+    page-break-inside: avoid !important;
+  }
+}

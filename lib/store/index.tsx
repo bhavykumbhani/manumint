@@ -273,7 +273,9 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
   const [isSyncingCloud, setIsSyncingCloud] = useState(false);
 
   const restaurantRef = useRef<Restaurant | null>(null);
-  restaurantRef.current = restaurant;
+  useEffect(() => {
+    restaurantRef.current = restaurant;
+  }, [restaurant]);
 
   // Helper to persist state to localStorage (offline/cache)
   const persistLocalState = (
@@ -295,7 +297,11 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     setAllItems(nextItems);
 
     if (currentUser) {
-      const userRests = nextRestaurants.filter((r) => r.owner_id === currentUser.id);
+      const userRests = nextRestaurants.filter(
+        (r) =>
+          r.owner_id === currentUser.id ||
+          (r.owner_email && currentUser.email && r.owner_email.toLowerCase() === currentUser.email.toLowerCase())
+      );
       if (userRests.length > 0) {
         const userRest = userRests[userRests.length - 1];
         setRestaurant(userRest);
@@ -463,12 +469,15 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(profile));
           localStorage.removeItem(`${STORAGE_KEY_PREFIX}_logged_out`);
 
-          // Fetch user's restaurants from Supabase
-          const { data: userRests, error: restErr } = await supabase
-            .from("restaurants")
-            .select("*")
-            .eq("owner_id", authUser.id)
-            .order("created_at", { ascending: false });
+          // Fetch user's restaurants from Supabase (by owner_id or owner_email)
+          const authEmail = (authUser.email || "").toLowerCase().trim();
+          let query = supabase.from("restaurants").select("*");
+          if (authEmail) {
+            query = query.or(`owner_id.eq.${authUser.id},owner_email.ilike.${authEmail}`);
+          } else {
+            query = query.eq("owner_id", authUser.id);
+          }
+          const { data: userRests, error: restErr } = await query.order("created_at", { ascending: false });
 
           if (!restErr && userRests && userRests.length > 0) {
             const activeRest = userRests[0] as Restaurant;
@@ -512,10 +521,13 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
         const parsedUser: Profile = JSON.parse(storedUser);
         setUser(parsedUser);
 
-        // Find user's restaurant
+        // Find user's restaurant by active ID, owner_id, or owner_email
         let userRest = activeRestId ? rList.find((r) => r.id === activeRestId) : null;
         if (!userRest) {
-          const userRests = rList.filter((r) => r.owner_id === parsedUser.id);
+          const userRests = rList.filter((r) =>
+            r.owner_id === parsedUser.id ||
+            (r.owner_email && parsedUser.email && r.owner_email.toLowerCase() === parsedUser.email.toLowerCase())
+          );
           userRest = userRests.length > 0 ? userRests[userRests.length - 1] : null;
         }
 
@@ -609,7 +621,9 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
 
             const storedRests = localStorage.getItem(`${STORAGE_KEY_PREFIX}_restaurants`);
             const rList: Restaurant[] = storedRests ? JSON.parse(storedRests) : allRestaurants;
-            const userRests = rList.filter((r) => r.owner_id === localUser.id);
+            const userRests = rList.filter(
+              (r) => r.owner_id === localUser.id || (r.owner_email && r.owner_email.toLowerCase() === cleanEmail)
+            );
             if (userRests.length > 0) {
               const matchedRest = userRests[userRests.length - 1];
               setRestaurant(matchedRest);
@@ -703,6 +717,46 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem(`${STORAGE_KEY_PREFIX}_registered_users`, JSON.stringify(regUsers));
           }
 
+          // Hydrate user's restaurant immediately so dashboard renders without redirecting
+          let activeUserRest: Restaurant | null = null;
+          try {
+            const { data: cloudRests } = await supabase
+              .from("restaurants")
+              .select("*")
+              .or(`owner_id.eq.${data.user.id},owner_email.ilike.${cleanEmail}`)
+              .order("created_at", { ascending: false });
+
+            if (cloudRests && cloudRests.length > 0) {
+              activeUserRest = cloudRests[0] as Restaurant;
+            }
+          } catch {
+            // fallback
+          }
+
+          if (!activeUserRest) {
+            const storedRests = localStorage.getItem(`${STORAGE_KEY_PREFIX}_restaurants`);
+            const rList: Restaurant[] = storedRests ? JSON.parse(storedRests) : allRestaurants;
+            const matchedLocal = rList.filter(
+              (r) => r.owner_id === data.user.id || (r.owner_email && r.owner_email.toLowerCase() === cleanEmail)
+            );
+            if (matchedLocal.length > 0) {
+              activeUserRest = matchedLocal[matchedLocal.length - 1];
+            }
+          }
+
+          if (activeUserRest) {
+            setRestaurant(activeUserRest);
+            localStorage.setItem(`${STORAGE_KEY_PREFIX}_active_restaurant_id`, activeUserRest.id);
+            try {
+              const { data: catData } = await supabase.from("categories").select("*").eq("restaurant_id", activeUserRest.id).order("position");
+              const { data: itemData } = await supabase.from("menu_items").select("*").eq("restaurant_id", activeUserRest.id).order("position");
+              if (catData && catData.length > 0) setCategories(catData as Category[]);
+              if (itemData && itemData.length > 0) setItems(itemData as MenuItem[]);
+            } catch {
+              // ignore
+            }
+          }
+
           await refreshData();
           return { success: true };
         }
@@ -741,8 +795,10 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     setUser(existingUser);
     localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(existingUser));
 
-    // Find user's restaurant or create starter
-    const userRests = allRestaurants.filter((r) => r.owner_id === existingUser!.id);
+    // Find user's restaurant by owner_id or owner_email or create starter
+    const userRests = allRestaurants.filter(
+      (r) => r.owner_id === existingUser!.id || (r.owner_email && r.owner_email.toLowerCase() === cleanEmail)
+    );
     const existingRest = userRests.length > 0 ? userRests[userRests.length - 1] : null;
 
     if (!existingRest) {

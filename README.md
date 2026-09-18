@@ -10,12 +10,17 @@
 - **Enterprise SEO & Structured Data**: Built-in dynamic `sitemap.xml`, `robots.txt`, Schema.org JSON-LD structured data (`SoftwareApplication`, `Product`, `Restaurant`, `Menu`).
 - **Meta Ads Integration**: Plug-and-play Facebook Pixel event tracking for `PageView`, `CompleteRegistration`, `InitiateCheckout`, and `Lead` conversions.
 - **Official FSSAI Dietary Standards**: Green circle for Pure Veg, Red/Crimson triangle for Non-Veg, Yellow dot for Egg, plus Jain and Vegan tags.
-- **4 Designer Responsive Themes**:
+- **9 Designer Responsive Themes**:
   - *Artisanal Café*: Warm amber & cream tones with photo cards.
   - *Clean Minimalist*: Crisp editorial layout with structured dividers.
   - *Modern Dark*: Rich charcoal with emerald glow for bars & lounges.
-  - *Fine Dining*: High-end serif typography with dot-leader spacing.
-- **Permanent Table QR Codes**: Update dishes and prices anytime without ever reprinting physical standees.
+  - *Fine Dining / Elegant*: High-end serif typography with dot-leader spacing.
+  - *Street Bites*: High-energy vibrant street food layout.
+  - *Royal Heritage*: Golden luxury aesthetics for traditional & royal dining.
+  - *Retro Diner*: Nostalgic 80s diner styling with bold badges.
+  - *Neon Lounge*: Electric neon cyberpunk vibes for nightlife & lounges.
+  - *Botanical Garden*: Earthy fresh greens for farm-to-table organic cafés.
+- **Permanent Table QR Codes & Multi-Item WhatsApp Orders**: Update dishes and prices anytime without ever reprinting standees, with multi-item table order tray & waiter calling.
 
 ---
 

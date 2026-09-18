@@ -73,17 +73,17 @@ CREATE POLICY "Public can view published restaurants"
 DROP POLICY IF EXISTS "Owners can insert their restaurants" ON public.restaurants;
 CREATE POLICY "Owners can insert their restaurants"
   ON public.restaurants FOR INSERT
-  WITH CHECK (true);
+  WITH CHECK (auth.uid() = owner_id OR auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "Owners can update their restaurants" ON public.restaurants;
 CREATE POLICY "Owners can update their restaurants"
   ON public.restaurants FOR UPDATE
-  USING (true);
+  USING (auth.uid() = owner_id OR auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "Owners can delete their restaurants" ON public.restaurants;
 CREATE POLICY "Owners can delete their restaurants"
   ON public.restaurants FOR DELETE
-  USING (true);
+  USING (auth.uid() = owner_id);
 
 -- ------------------------------------------------------------------------------
 -- 3. Categories Table
@@ -112,17 +112,35 @@ CREATE POLICY "Public can view published restaurant categories"
 DROP POLICY IF EXISTS "Owners can insert categories" ON public.categories;
 CREATE POLICY "Owners can insert categories"
   ON public.categories FOR INSERT
-  WITH CHECK (true);
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.restaurants r
+      WHERE r.id = restaurant_id
+      AND (r.owner_id = auth.uid() OR auth.uid() IS NOT NULL)
+    )
+  );
 
 DROP POLICY IF EXISTS "Owners can update categories" ON public.categories;
 CREATE POLICY "Owners can update categories"
   ON public.categories FOR UPDATE
-  USING (true);
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.restaurants r
+      WHERE r.id = restaurant_id
+      AND (r.owner_id = auth.uid() OR auth.uid() IS NOT NULL)
+    )
+  );
 
 DROP POLICY IF EXISTS "Owners can delete categories" ON public.categories;
 CREATE POLICY "Owners can delete categories"
   ON public.categories FOR DELETE
-  USING (true);
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.restaurants r
+      WHERE r.id = restaurant_id
+      AND (r.owner_id = auth.uid() OR auth.uid() IS NOT NULL)
+    )
+  );
 
 -- ------------------------------------------------------------------------------
 -- 4. Menu Items Table
@@ -161,17 +179,35 @@ CREATE POLICY "Public can view published restaurant items"
 DROP POLICY IF EXISTS "Owners can insert items" ON public.menu_items;
 CREATE POLICY "Owners can insert items"
   ON public.menu_items FOR INSERT
-  WITH CHECK (true);
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.restaurants r
+      WHERE r.id = restaurant_id
+      AND (r.owner_id = auth.uid() OR auth.uid() IS NOT NULL)
+    )
+  );
 
 DROP POLICY IF EXISTS "Owners can update items" ON public.menu_items;
 CREATE POLICY "Owners can update items"
   ON public.menu_items FOR UPDATE
-  USING (true);
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.restaurants r
+      WHERE r.id = restaurant_id
+      AND (r.owner_id = auth.uid() OR auth.uid() IS NOT NULL)
+    )
+  );
 
 DROP POLICY IF EXISTS "Owners can delete items" ON public.menu_items;
 CREATE POLICY "Owners can delete items"
   ON public.menu_items FOR DELETE
-  USING (true);
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.restaurants r
+      WHERE r.id = restaurant_id
+      AND (r.owner_id = auth.uid() OR auth.uid() IS NOT NULL)
+    )
+  );
 
 -- ------------------------------------------------------------------------------
 -- 5. Menu Views (Analytics)

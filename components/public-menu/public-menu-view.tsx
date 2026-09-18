@@ -6,7 +6,9 @@ import { FullRestaurantData, MenuItem } from "@/types";
 import { MENU_TEMPLATES } from "@/components/menu-templates";
 import { Search, Sparkles } from "lucide-react";
 import { DishDetailModal } from "./dish-detail-modal";
+import { CartTray, CartItem } from "./cart-tray";
 import { trackEvent } from "@/lib/meta-pixel";
+import { recordMenuView } from "@/lib/supabase/queries";
 
 interface PublicMenuViewProps {
   data: FullRestaurantData;
@@ -18,6 +20,41 @@ export function PublicMenuView({ data }: PublicMenuViewProps) {
   const [selectedFilter, setSelectedFilter] = useState<"all" | "veg" | "non_veg" | "egg" | "jain" | "vegan">("all");
   const [activeCategory, setActiveCategory] = useState<string>(categories[0]?.id || "");
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+  const [cart, setCart] = useState<CartItem[]>([]);
+
+  const handleAddToCart = (item: MenuItem) => {
+    setCart((prev) => {
+      const existing = prev.find((c) => c.item.id === item.id);
+      if (existing) {
+        return prev.map((c) =>
+          c.item.id === item.id ? { ...c, quantity: c.quantity + 1 } : c
+        );
+      }
+      return [...prev, { item, quantity: 1 }];
+    });
+  };
+
+  const handleUpdateQuantity = (itemId: string, delta: number) => {
+    setCart((prev) =>
+      prev
+        .map((c) => {
+          if (c.item.id === itemId) {
+            const nextQty = c.quantity + delta;
+            return nextQty > 0 ? { ...c, quantity: nextQty } : null;
+          }
+          return c;
+        })
+        .filter(Boolean) as CartItem[]
+    );
+  };
+
+  const handleRemoveItem = (itemId: string) => {
+    setCart((prev) => prev.filter((c) => c.item.id !== itemId));
+  };
+
+  const handleClearCart = () => {
+    setCart([]);
+  };
 
   useEffect(() => {
     trackEvent("ViewContent", {
@@ -25,6 +62,9 @@ export function PublicMenuView({ data }: PublicMenuViewProps) {
       content_category: "Restaurant Menu",
       content_ids: [restaurant.id],
     });
+    if (typeof window !== "undefined" && restaurant.id) {
+      recordMenuView(restaurant.id, document.referrer, navigator.userAgent);
+    }
   }, [restaurant.id, restaurant.name]);
 
   const TemplateComponent = MENU_TEMPLATES[restaurant.template_key] || MENU_TEMPLATES.cafe;
@@ -197,10 +237,20 @@ export function PublicMenuView({ data }: PublicMenuViewProps) {
         item={selectedItem}
         restaurant={restaurant}
         onClose={() => setSelectedItem(null)}
+        onAddToCart={handleAddToCart}
+      />
+
+      {/* Floating Cart Tray & Call Waiter Controls */}
+      <CartTray
+        restaurant={restaurant}
+        cart={cart}
+        onUpdateQuantity={handleUpdateQuantity}
+        onRemoveItem={handleRemoveItem}
+        onClearCart={handleClearCart}
       />
 
       {/* Powered by ManuMaker Badge */}
-      <footer className="py-6 text-center text-xs text-zinc-400 dark:text-zinc-600 border-t border-zinc-200/60 dark:border-zinc-800">
+      <footer className="py-6 pb-20 text-center text-xs text-zinc-400 dark:text-zinc-600 border-t border-zinc-200/60 dark:border-zinc-800">
         <Link
           href="/"
           className="inline-flex items-center justify-center gap-1.5 font-medium hover:text-emerald-600 transition-colors"

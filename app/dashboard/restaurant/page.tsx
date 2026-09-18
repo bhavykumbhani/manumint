@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useMenuStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
-import { Store, Globe, Phone, MessageCircle, MapPin, Sparkles, CheckCircle2, Check } from "lucide-react";
+import { Store, Globe, Phone, MessageCircle, MapPin, Sparkles, CheckCircle2, Check, Upload, Trash2 } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
 import { RestaurantDietaryType } from "@/types";
 
@@ -29,6 +29,39 @@ export default function RestaurantSettingsPage() {
   const [currency, setCurrency] = useState("INR");
   const [published, setPublished] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast("Logo image should be under 5MB", "error");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setLogoUrl(event.target?.result as string);
+      toast("Logo loaded from device", "success");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      toast("Cover image should be under 8MB", "error");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setCoverImageUrl(event.target?.result as string);
+      toast("Cover image loaded from device", "success");
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     if (restaurant) {
@@ -278,31 +311,127 @@ export default function RestaurantSettingsPage() {
             Media & Images
           </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                Logo Image URL
+          {/* Hidden File Inputs */}
+          <input
+            type="file"
+            ref={logoInputRef}
+            accept="image/*"
+            onChange={handleLogoFileChange}
+            className="hidden"
+          />
+          <input
+            type="file"
+            ref={coverInputRef}
+            accept="image/*"
+            onChange={handleCoverFileChange}
+            className="hidden"
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {/* Logo Image */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                Restaurant Logo
               </label>
-              <input
-                type="url"
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="https://images.unsplash.com/..."
-                className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-              />
+
+              {logoUrl ? (
+                <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700">
+                  <div className="w-14 h-14 rounded-full overflow-hidden bg-white dark:bg-zinc-750 shrink-0 border border-zinc-300 dark:border-zinc-600">
+                    <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate">Logo Active</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => logoInputRef.current?.click()}
+                        className="text-[11px] font-semibold text-emerald-600 hover:underline"
+                      >
+                        Change File
+                      </button>
+                      <span className="text-zinc-300 dark:text-zinc-600">•</span>
+                      <button
+                        type="button"
+                        onClick={() => setLogoUrl("")}
+                        className="text-[11px] font-semibold text-rose-500 hover:underline flex items-center gap-0.5"
+                      >
+                        <Trash2 className="w-3 h-3" /> Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    className="w-full px-3 py-2.5 rounded-xl border border-dashed border-emerald-500/70 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center justify-center gap-2 hover:bg-emerald-100/50 transition-colors"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Upload Logo from Device
+                  </button>
+                  <input
+                    type="url"
+                    value={logoUrl}
+                    onChange={(e) => setLogoUrl(e.target.value)}
+                    placeholder="or paste logo URL: https://..."
+                    className="w-full px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              )}
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                Cover Photo URL
+            {/* Cover Photo */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                Cover Photo
               </label>
-              <input
-                type="url"
-                value={coverImageUrl}
-                onChange={(e) => setCoverImageUrl(e.target.value)}
-                placeholder="https://images.unsplash.com/..."
-                className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-              />
+
+              {coverImageUrl ? (
+                <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700">
+                  <div className="w-16 h-12 rounded-xl overflow-hidden bg-zinc-200 dark:bg-zinc-700 shrink-0 border border-zinc-300 dark:border-zinc-600">
+                    <img src={coverImageUrl} alt="Cover" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate">Cover Photo Active</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => coverInputRef.current?.click()}
+                        className="text-[11px] font-semibold text-emerald-600 hover:underline"
+                      >
+                        Change File
+                      </button>
+                      <span className="text-zinc-300 dark:text-zinc-600">•</span>
+                      <button
+                        type="button"
+                        onClick={() => setCoverImageUrl("")}
+                        className="text-[11px] font-semibold text-rose-500 hover:underline flex items-center gap-0.5"
+                      >
+                        <Trash2 className="w-3 h-3" /> Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => coverInputRef.current?.click()}
+                    className="w-full px-3 py-2.5 rounded-xl border border-dashed border-emerald-500/70 bg-emerald-50/40 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center justify-center gap-2 hover:bg-emerald-100/50 transition-colors"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Upload Cover Photo
+                  </button>
+                  <input
+                    type="url"
+                    value={coverImageUrl}
+                    onChange={(e) => setCoverImageUrl(e.target.value)}
+                    placeholder="or paste cover URL: https://..."
+                    className="w-full px-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -4,17 +4,19 @@ import React from "react";
 import { MenuItem, Restaurant } from "@/types";
 import { FoodIndicator, DietaryBadges } from "@/components/ui/food-indicator";
 import { formatCurrency } from "@/lib/utils";
-import { X, MessageCircle, Sparkles, Check, Heart } from "lucide-react";
+import { X, MessageCircle, Sparkles, Check, Heart, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface DishDetailModalProps {
   item: MenuItem | null;
   restaurant: Restaurant;
   onClose: () => void;
+  onAddToCart?: (item: MenuItem) => void;
 }
 
-export function DishDetailModal({ item, restaurant, onClose }: DishDetailModalProps) {
+export function DishDetailModal({ item, restaurant, onClose, onAddToCart }: DishDetailModalProps) {
   const [liked, setLiked] = React.useState(false);
+  const [justAdded, setJustAdded] = React.useState(false);
 
   if (!item) return null;
 
@@ -28,6 +30,17 @@ export function DishDetailModal({ item, restaurant, onClose }: DishDetailModalPr
         )}) from your digital menu!`
       )}`
     : "";
+
+  const handleAdd = () => {
+    if (onAddToCart && !isSoldOut) {
+      onAddToCart(item);
+      setJustAdded(true);
+      setTimeout(() => {
+        setJustAdded(false);
+        onClose();
+      }, 500);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
@@ -137,8 +150,27 @@ export function DishDetailModal({ item, restaurant, onClose }: DishDetailModalPr
         </div>
 
         {/* Action Footer */}
-        <div className="p-4 bg-zinc-50 dark:bg-zinc-850/80 border-t border-zinc-200 dark:border-zinc-800 flex items-center gap-3">
-          {whatsappUrl && (
+        <div className="p-4 bg-zinc-50 dark:bg-zinc-850/80 border-t border-zinc-200 dark:border-zinc-800 flex items-center gap-2.5">
+          {onAddToCart && !isSoldOut ? (
+            <Button
+              variant="primary"
+              size="md"
+              onClick={handleAdd}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-500 font-bold shadow-md shadow-emerald-600/20"
+            >
+              {justAdded ? (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Added to Tray!
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add to Order Tray
+                </>
+              )}
+            </Button>
+          ) : whatsappUrl && (
             <a
               href={whatsappUrl}
               target="_blank"
