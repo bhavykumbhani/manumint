@@ -18,9 +18,11 @@ import {
   X,
   Sparkles,
   ChevronRight,
+  Cloud,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
+import { useToast } from "@/components/ui/toast";
 
 export default function DashboardLayout({
   children,
@@ -29,7 +31,8 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, restaurant, logout, isLoading } = useMenuStore();
+  const { user, restaurant, logout, isLoading, syncRestaurantToCloud, isSyncingCloud } = useMenuStore();
+  const { toast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // If user is not logged in after loading, redirect to login
@@ -112,11 +115,30 @@ export default function DashboardLayout({
               <span className={`w-2 h-2 rounded-full ${restaurant.published ? "bg-emerald-500" : "bg-amber-500"}`} />
             </div>
             <p className="text-[11px] font-mono text-zinc-400 truncate mb-2">/menu/{restaurant.slug}</p>
-            <a href={publicUrl} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm" className="w-full text-xs">
-                <ExternalLink className="w-3.5 h-3.5 mr-1" /> View Live
+            <div className="space-y-1.5">
+              <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="block">
+                <Button variant="outline" size="sm" className="w-full text-xs">
+                  <ExternalLink className="w-3.5 h-3.5 mr-1" /> View Live
+                </Button>
+              </a>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-[11px] text-zinc-500 hover:text-emerald-700 dark:hover:text-emerald-400 h-7"
+                onClick={async () => {
+                  const res = await syncRestaurantToCloud();
+                  if (res.success) {
+                    toast("Menu synced to Cloud! Mobile QR scanning is active.", "success");
+                  } else {
+                    toast(res.error || "Failed to sync to cloud", "error");
+                  }
+                }}
+                isLoading={isSyncingCloud}
+              >
+                <Cloud className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                {isSyncingCloud ? "Syncing..." : "Sync to Cloud"}
               </Button>
-            </a>
+            </div>
           </div>
         )}
 

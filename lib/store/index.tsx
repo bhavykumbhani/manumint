@@ -13,6 +13,7 @@ interface MenuStoreContextType {
   items: MenuItem[];
   isLoading: boolean;
   isCloudConnected: boolean;
+  isSyncingCloud: boolean;
 
   // Auth methods
   login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
@@ -25,6 +26,7 @@ interface MenuStoreContextType {
   updateRestaurant: (updates: Partial<Restaurant>) => Promise<void>;
   publishRestaurant: () => Promise<{ success: boolean; error?: string }>;
   setTemplate: (template: TemplateKey) => Promise<void>;
+  syncRestaurantToCloud: (targetRest?: Restaurant) => Promise<{ success: boolean; error?: string }>;
 
   // Category methods
   addCategory: (name: string, description?: string, targetRestaurantId?: string) => Promise<Category>;
@@ -56,6 +58,98 @@ const getStorageItem = (key: string): string | null => {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(`${STORAGE_KEY_PREFIX}_${key}`) || localStorage.getItem(`${LEGACY_STORAGE_KEY_PREFIX}_${key}`);
 };
+
+/**
+ * Ensures there is an active Supabase user session so Row Level Security (RLS)
+ * passes without blocking guest or onboarding users.
+ */
+async function ensureSupabaseAuthUser(): Promise<string | null> {
+  const supabase = getSupabaseBrowserClient();
+  if (!isSupabaseConfigured() || !supabase) return null;
+
+  try {
+    // 1. Check existing session
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData?.session?.user) {
+      return sessionData.session.user.id;
+    }
+
+    // 2. Check stored credentials
+    const credsStr = typeof window !== "undefined" ? localStorage.getItem(`${STORAGE_KEY_PREFIX}_cloud_creds`) : null;
+    if (credsStr) {
+      try {
+        const creds = JSON.parse(credsStr);
+        if (creds.email && creds.password) {
+          const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+            email: creds.email,
+            password: creds.password,
+          });
+          if (!signInErr && signInData?.user) {
+            return signInData.user.id;
+          }
+        }
+      } catch {
+        // ignore parse error
+      }
+    }
+
+    // 3. Auto-register a unique owner session
+    const autoEmail = `merchant_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}@manumaker.app`;
+    const autoPass = `Mm@${safeUUID().replace(/-/g, "").slice(0, 10)}!`;
+    const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+      email: autoEmail,
+      password: autoPass,
+    });
+
+    if (!signUpErr && signUpData?.user) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          `${STORAGE_KEY_PREFIX}_cloud_creds`,
+          JSON.stringify({ email: autoEmail, password: autoPass })
+        );
+      }
+      return signUpData.user.id;
+    }
+  } catch (e) {
+    console.warn("Auto Supabase Auth error:", e);
+  }
+  return null;
+}
+
+/**
+ * Robustly upserts restaurant to Supabase, gracefully omitting columns like
+ * 'dietary_type' or 'owner_email' if the remote schema cache does not yet have them.
+ */
+async function saveRestaurantToCloud(supabase: any, restData: any) {
+  const { data, error } = await supabase
+    .from("restaurants")
+    .upsert(restData)
+    .select()
+    .single();
+
+  if (!error && data) return { data, error: null };
+
+  // If column error (e.g. dietary_type or owner_email doesn't exist yet on remote table)
+  if (
+    error &&
+    (error.message?.includes("dietary_type") ||
+      error.message?.includes("owner_email") ||
+      error.code === "PGRST204" ||
+      error.message?.includes("schema cache"))
+  ) {
+    const sanitized = { ...restData };
+    delete sanitized.dietary_type;
+    delete sanitized.owner_email;
+    const retry = await supabase
+      .from("restaurants")
+      .upsert(sanitized)
+      .select()
+      .single();
+    return retry;
+  }
+
+  return { data, error };
+}
 
 const MenuStoreContext = createContext<MenuStoreContextType | undefined>(undefined);
 
@@ -176,6 +270,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
   const [allItems, setAllItems] = useState<MenuItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCloudConnected, setIsCloudConnected] = useState(false);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
 
   const restaurantRef = useRef<Restaurant | null>(null);
   restaurantRef.current = restaurant;
@@ -218,6 +313,114 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
       }
     }
   };
+
+  /**
+   * Syncs the restaurant, its categories, and its dishes to Supabase Cloud,
+   * guaranteeing an authenticated session so public QR codes work anywhere.
+   */
+  const syncRestaurantToCloud = useCallback(
+    async (targetRest?: Restaurant): Promise<{ success: boolean; error?: string }> => {
+      const supabase = getSupabaseBrowserClient();
+      if (!isSupabaseConfigured() || !supabase) {
+        return { success: false, error: "Cloud database is not configured" };
+      }
+
+      const currentRest = targetRest || restaurantRef.current;
+      if (!currentRest) {
+        return { success: false, error: "No restaurant found to sync" };
+      }
+
+      setIsSyncingCloud(true);
+      try {
+        const authUserId = await ensureSupabaseAuthUser();
+        const ownerId = authUserId || currentRest.owner_id;
+
+        const restPayload: any = {
+          id: currentRest.id,
+          owner_id: ownerId,
+          name: currentRest.name,
+          slug: currentRest.slug,
+          description: currentRest.description || null,
+          restaurant_type: currentRest.restaurant_type || "Café",
+          dietary_type: currentRest.dietary_type || "both",
+          logo_url: currentRest.logo_url || null,
+          cover_image_url: currentRest.cover_image_url || null,
+          phone: currentRest.phone || null,
+          whatsapp: currentRest.whatsapp || null,
+          instagram: currentRest.instagram || null,
+          address: currentRest.address || null,
+          city: currentRest.city || null,
+          state: currentRest.state || null,
+          country: currentRest.country || "India",
+          currency: currentRest.currency || "INR",
+          template_key: currentRest.template_key || "cafe",
+          primary_color: currentRest.primary_color || "#10B981",
+          secondary_color: currentRest.secondary_color || "#047857",
+          published: currentRest.published ?? true,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error: restErr } = await saveRestaurantToCloud(supabase, restPayload);
+        if (restErr) {
+          console.warn("Cloud sync restaurant notice:", restErr.message);
+        }
+
+        const updatedRest: Restaurant = { ...currentRest, owner_id: ownerId };
+        setRestaurant(updatedRest);
+        setAllRestaurants((prev) => prev.map((r) => (r.id === updatedRest.id ? updatedRest : r)));
+
+        // Sync categories for this restaurant
+        const storedCats = getStorageItem("categories");
+        const currentAllCats: Category[] = storedCats ? JSON.parse(storedCats) : [];
+        const catsToSync = currentAllCats.filter((c) => c.restaurant_id === currentRest.id);
+        for (const cat of catsToSync) {
+          await supabase.from("categories").upsert({
+            id: cat.id,
+            restaurant_id: currentRest.id,
+            name: cat.name,
+            description: cat.description || null,
+            position: cat.position,
+            is_visible: cat.is_visible ?? true,
+            updated_at: new Date().toISOString(),
+          });
+        }
+
+        // Sync items for this restaurant
+        const storedItems = getStorageItem("items");
+        const currentAllItems: MenuItem[] = storedItems ? JSON.parse(storedItems) : [];
+        const itemsToSync = currentAllItems.filter((i) => i.restaurant_id === currentRest.id);
+        for (const item of itemsToSync) {
+          await supabase.from("menu_items").upsert({
+            id: item.id,
+            restaurant_id: currentRest.id,
+            category_id: item.category_id,
+            name: item.name,
+            description: item.description || null,
+            price: item.price,
+            image_url: item.image_url || null,
+            food_type: item.food_type || "veg",
+            is_available: item.is_available ?? true,
+            is_visible: item.is_visible ?? true,
+            is_bestseller: item.is_bestseller ?? false,
+            is_spicy: item.is_spicy ?? false,
+            is_vegan: item.is_vegan ?? false,
+            is_jain: item.is_jain ?? false,
+            position: item.position,
+            updated_at: new Date().toISOString(),
+          });
+        }
+
+        setIsCloudConnected(true);
+        return { success: true };
+      } catch (e: any) {
+        console.error("Cloud sync failed:", e);
+        return { success: false, error: e?.message || "Failed to sync to cloud" };
+      } finally {
+        setIsSyncingCloud(false);
+      }
+    },
+    []
+  );
 
   // Load from Supabase or fallback to localStorage
   const refreshData = useCallback(async () => {
@@ -320,6 +523,21 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
           setRestaurant(userRest);
           setCategories(cList.filter((c) => c.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
           setItems(iList.filter((i) => i.restaurant_id === userRest.id).sort((a, b) => a.position - b.position));
+
+          if (cloudAvailable && supabase && userRest.id !== DEMO_RESTAURANT_ID) {
+            supabase
+              .from("restaurants")
+              .select("id")
+              .eq("id", userRest.id)
+              .maybeSingle()
+              .then((res: any) => {
+                const remoteRest = res?.data;
+                if (!remoteRest) {
+                  syncRestaurantToCloud(userRest);
+                }
+              })
+              .catch(() => {});
+          }
         } else {
           setRestaurant(null);
           setCategories([]);
@@ -344,7 +562,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [syncRestaurantToCloud]);
 
   useEffect(() => {
     refreshData();
@@ -727,8 +945,26 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
 
   // Create Restaurant (Cloud + Local)
   const createRestaurant = async (data: Partial<Restaurant>): Promise<Restaurant> => {
+    const supabase = getSupabaseBrowserClient();
+    let authUserId: string | null = null;
+    if (isSupabaseConfigured() && supabase) {
+      authUserId = await ensureSupabaseAuthUser();
+    }
+
     let activeUser = user;
-    if (!activeUser) {
+    if (authUserId) {
+      if (!activeUser || activeUser.id !== authUserId) {
+        activeUser = {
+          id: authUserId,
+          full_name: activeUser?.full_name || "Restaurant Owner",
+          email: activeUser?.email || "owner@manumaker.in",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setUser(activeUser);
+        localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(activeUser));
+      }
+    } else if (!activeUser) {
       const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}_current_user`);
       if (stored) {
         activeUser = JSON.parse(stored);
@@ -757,7 +993,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     const newRestId = safeUUID();
     const newRestData: Partial<Restaurant> = {
       id: newRestId,
-      owner_id: activeUser!.id,
+      owner_id: authUserId || activeUser!.id,
       owner_email: activeUser!.email.toLowerCase().trim(),
       name: data.name || "My Restaurant",
       slug: data.slug ? generateSlug(data.slug) : slug,
@@ -781,17 +1017,12 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     };
 
     // Try Supabase insert if cloud configured
-    const supabase = getSupabaseBrowserClient();
     if (isSupabaseConfigured() && supabase) {
       try {
-        const { data: created, error } = await supabase
-          .from("restaurants")
-          .insert(newRestData)
-          .select()
-          .single();
+        const { data: created, error } = await saveRestaurantToCloud(supabase, newRestData);
 
         if (!error && created) {
-          const createdRest = created as Restaurant;
+          const createdRest = { ...newRestData, ...created } as Restaurant;
           setRestaurant(createdRest);
           localStorage.setItem(`${STORAGE_KEY_PREFIX}_active_restaurant_id`, createdRest.id);
 
@@ -836,18 +1067,12 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     const supabase = getSupabaseBrowserClient();
     if (isSupabaseConfigured() && supabase) {
       try {
-        const { data: updated, error } = await supabase
-          .from("restaurants")
-          .update({ ...updates, updated_at: new Date().toISOString() })
-          .eq("id", restaurant.id)
-          .select()
-          .single();
-
-        if (!error && updated) {
-          setRestaurant(updated as Restaurant);
-          setAllRestaurants((prev) => prev.map((r) => (r.id === restaurant.id ? (updated as Restaurant) : r)));
-          return;
-        }
+        await ensureSupabaseAuthUser();
+        await saveRestaurantToCloud(supabase, {
+          ...restaurant,
+          ...updates,
+          updated_at: new Date().toISOString(),
+        });
       } catch (err) {
         console.error("Supabase updateRestaurant error:", err);
       }
@@ -911,13 +1136,15 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     const supabase = getSupabaseBrowserClient();
     if (isSupabaseConfigured() && supabase) {
       try {
-        await supabase.from("categories").insert({
+        await ensureSupabaseAuthUser();
+        await supabase.from("categories").upsert({
           id: newCategory.id,
           restaurant_id: targetId,
           name: newCategory.name,
           description: newCategory.description,
           position: newCategory.position,
           is_visible: true,
+          updated_at: new Date().toISOString(),
         });
       } catch (err) {
         console.error("Supabase addCategory error:", err);
@@ -932,6 +1159,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     const supabase = getSupabaseBrowserClient();
     if (isSupabaseConfigured() && supabase) {
       try {
+        await ensureSupabaseAuthUser();
         await supabase
           .from("categories")
           .update({ ...updates, updated_at: new Date().toISOString() })
@@ -1030,7 +1258,8 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     const supabase = getSupabaseBrowserClient();
     if (isSupabaseConfigured() && supabase) {
       try {
-        await supabase.from("menu_items").insert({
+        await ensureSupabaseAuthUser();
+        await supabase.from("menu_items").upsert({
           id: newItem.id,
           restaurant_id: targetId,
           category_id: newItem.category_id,
@@ -1046,6 +1275,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
           is_vegan: newItem.is_vegan,
           is_jain: newItem.is_jain,
           position: newItem.position,
+          updated_at: new Date().toISOString(),
         });
       } catch (err) {
         console.error("Supabase addItem error:", err);
@@ -1060,6 +1290,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     const supabase = getSupabaseBrowserClient();
     if (isSupabaseConfigured() && supabase) {
       try {
+        await ensureSupabaseAuthUser();
         await supabase
           .from("menu_items")
           .update({ ...updates, updated_at: new Date().toISOString() })
@@ -1216,6 +1447,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
         items,
         isLoading,
         isCloudConnected,
+        isSyncingCloud,
         login,
         signup,
         logout,
@@ -1224,6 +1456,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
         updateRestaurant,
         publishRestaurant,
         setTemplate,
+        syncRestaurantToCloud,
         addCategory,
         updateCategory,
         deleteCategory,

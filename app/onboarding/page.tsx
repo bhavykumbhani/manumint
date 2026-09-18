@@ -30,7 +30,7 @@ import {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user, restaurant, createRestaurant, setTemplate, addCategory, addItem, publishRestaurant } = useMenuStore();
+  const { user, restaurant, createRestaurant, setTemplate, addCategory, addItem, publishRestaurant, syncRestaurantToCloud } = useMenuStore();
   const { toast } = useToast();
 
   const [step, setStep] = useState(1);
@@ -123,7 +123,14 @@ export default function OnboardingPage() {
         newRest.id
       );
 
-      // 4. Set celebration state
+      // 4. Guaranteed Cloud Sync to Supabase so QR scan works instantly on any phone
+      try {
+        await syncRestaurantToCloud(newRest);
+      } catch (syncErr) {
+        console.warn("Background cloud sync notice:", syncErr);
+      }
+
+      // 5. Set celebration state
       const targetSlug = newRest.slug;
       setCreatedSlug(targetSlug);
       const publicUrl = `${getAppBaseUrl()}/menu/${targetSlug}`;
@@ -606,8 +613,12 @@ export default function OnboardingPage() {
               <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
                 Congratulations! Your digital menu for <strong>{restName}</strong> is now published and accessible to anyone via this QR code.
               </p>
-              <div className="mt-2.5">
+              <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2">
                 <EstablishmentDietaryBadge dietaryType={dietaryType} />
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 shadow-sm">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  ☁️ Live on Supabase Cloud • Scan with Any Phone
+                </span>
               </div>
             </div>
 

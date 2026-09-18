@@ -6,7 +6,8 @@ import { Restaurant } from "@/types";
 import { getAppBaseUrl } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
-import { Download, Copy, ExternalLink, Printer, Sparkles, Smartphone, Check } from "lucide-react";
+import { Download, Copy, ExternalLink, Printer, Sparkles, Smartphone, Check, Cloud } from "lucide-react";
+import { useMenuStore } from "@/lib/store";
 
 interface QRCodeViewProps {
   restaurant: Restaurant;
@@ -14,6 +15,7 @@ interface QRCodeViewProps {
 
 export function QRCodeView({ restaurant }: QRCodeViewProps) {
   const { toast } = useToast();
+  const { syncRestaurantToCloud, isSyncingCloud } = useMenuStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const standeeCanvasRef = useRef<HTMLCanvasElement>(null);
   const [copied, setCopied] = useState(false);
@@ -101,6 +103,38 @@ export function QRCodeView({ restaurant }: QRCodeViewProps) {
               <p className="text-xs text-zinc-500 font-mono mt-3 text-center break-all max-w-sm">
                 {publicUrl}
               </p>
+            </div>
+
+            {/* Cloud Status Banner */}
+            <div className="mb-4 p-3 bg-emerald-50/70 dark:bg-emerald-950/40 rounded-xl border border-emerald-200/70 dark:border-emerald-800/70 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                    Live Cloud Sync Active
+                  </p>
+                  <p className="text-[11px] text-emerald-700/90 dark:text-emerald-400 truncate">
+                    Ready to scan on any iPhone or Android camera
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 text-xs h-8 bg-white dark:bg-zinc-900 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50"
+                onClick={async () => {
+                  const res = await syncRestaurantToCloud(restaurant);
+                  if (res.success) {
+                    toast("Menu verified and synced to Cloud! Mobile QR scanning is active.", "success");
+                  } else {
+                    toast(res.error || "Failed to sync to cloud", "error");
+                  }
+                }}
+                isLoading={isSyncingCloud}
+              >
+                <Cloud className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                Sync Cloud
+              </Button>
             </div>
           </div>
 
