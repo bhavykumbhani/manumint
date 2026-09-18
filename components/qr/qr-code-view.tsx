@@ -190,7 +190,7 @@ export function QRCodeView({ restaurant }: QRCodeViewProps) {
 
                 <div className="mt-4 pt-3 border-t border-zinc-200/80 w-full flex items-center justify-between text-[10px] text-zinc-400 font-mono">
                   <span>Table No. ___</span>
-                  <span>MenuMint</span>
+                  <span>ManuMaker</span>
                 </div>
               </div>
             </div>

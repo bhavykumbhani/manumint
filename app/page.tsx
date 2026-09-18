@@ -22,6 +22,8 @@ import { Button } from "@/components/ui/button";
 import { TEMPLATE_METAS } from "@/components/menu-templates";
 import { FoodIndicator } from "@/components/ui/food-indicator";
 import { formatCurrency } from "@/lib/utils";
+import { Logo } from "@/components/ui/logo";
+import { trackLead } from "@/lib/meta-pixel";
 
 export default function LandingPage() {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
@@ -35,17 +37,7 @@ export default function LandingPage() {
       {/* Top Navbar */}
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-zinc-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-md">
-              <UtensilsCrossed className="w-5 h-5" />
-            </span>
-            <div className="flex flex-col">
-              <span className="text-lg font-black tracking-tight text-zinc-950">MenuMint</span>
-              <span className="text-[9px] uppercase tracking-widest text-emerald-700 font-bold -mt-1">
-                One QR • Zero Apps
-              </span>
-            </div>
-          </Link>
+          <Logo size="md" />
 
           <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-zinc-600">
             <a href="#how-it-works" className="hover:text-zinc-950 transition-colors">
@@ -134,7 +126,7 @@ export default function LandingPage() {
                 <span className="w-3 h-3 rounded-full bg-rose-500/80 inline-block" />
                 <span className="w-3 h-3 rounded-full bg-amber-500/80 inline-block" />
                 <span className="w-3 h-3 rounded-full bg-emerald-500/80 inline-block" />
-                <span className="ml-2 font-mono text-[11px] text-zinc-400">menumint.com/dashboard/menu</span>
+                <span className="ml-2 font-mono text-[11px] text-zinc-400">manumaker.com/dashboard/menu</span>
               </div>
               <span className="text-[11px] font-semibold text-emerald-400">● Live Synchronization</span>
             </div>
@@ -340,7 +332,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">
-              Why Restaurateurs Love MenuMint
+              Why Restaurateurs Love ManuMaker
             </span>
             <h2 className="text-3xl sm:text-4xl font-black text-white mt-2">
               The smartest menu on your tables
@@ -406,15 +398,15 @@ export default function LandingPage() {
             {[
               {
                 q: "If I change my prices or add new dishes, do I have to reprint my QR codes?",
-                a: "Never! Your QR code points to your permanent public restaurant URL (e.g. menumint.com/menu/cafe-aroma). Whenever you change a price from ₹30 to ₹35 or add a new category, your digital menu updates instantly while the physical QR code on your tables remains unchanged.",
+                a: "Never! Your QR code points to your permanent public restaurant URL (e.g. manumaker.com/menu/cafe-aroma). Whenever you change a price from ₹30 to ₹35 or add a new category, your digital menu updates instantly while the physical QR code on your tables remains unchanged.",
               },
               {
                 q: "Do customers need to download an app or create an account?",
                 a: "No. Customers point their native camera at the QR code and your menu opens in under 1 second in their default browser (Safari, Chrome). No apps, no downloads, and no account sign-in required.",
               },
               {
-                q: "Does MenuMint support Veg, Non-Veg, and Jain food indicators?",
-                a: "Yes! MenuMint adheres to official FSSAI dietary standards with crisp Veg (green dot in square), Non-Veg (crimson dot/triangle in square), and Egg indicators, along with Jain, Vegan, Spicy, and Bestseller tags.",
+                q: "Does ManuMaker support Veg, Non-Veg, and Jain food indicators?",
+                a: "Yes! ManuMaker adheres to official FSSAI dietary standards with crisp Veg (green dot in square), Non-Veg (crimson dot/triangle in square), and Egg indicators, along with Jain, Vegan, Spicy, and Bestseller tags.",
               },
               {
                 q: "Can I connect my WhatsApp and Instagram accounts?",
@@ -463,12 +455,9 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="py-12 bg-zinc-950 text-zinc-500 text-xs border-t border-zinc-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold text-xs">
-              M
-            </span>
-            <span className="text-sm font-bold text-white">MenuMint</span>
-            <span>— Beautiful digital menus. One QR.</span>
+          <div className="flex items-center gap-3">
+            <Logo size="sm" withLink={false} />
+            <span className="text-zinc-400 hidden sm:inline">— Beautiful digital menus. One QR.</span>
           </div>
 
           <div className="flex items-center gap-6">
@@ -478,12 +467,12 @@ export default function LandingPage() {
             <Link href="/login" className="hover:text-zinc-300">
               Owner Sign In
             </Link>
-            <Link href="/signup" className="hover:text-zinc-300">
+            <Link href="/signup" onClick={() => trackLead("Landing Footer CTA")} className="hover:text-zinc-300">
               Create Menu
             </Link>
           </div>
 
-          <p>© {new Date().getFullYear()} MenuMint SaaS. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} ManuMaker SaaS. All rights reserved.</p>
         </div>
       </footer>
     </div>

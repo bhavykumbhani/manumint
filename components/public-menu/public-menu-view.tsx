@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import { FullRestaurantData, MenuItem } from "@/types";
 import { MENU_TEMPLATES } from "@/components/menu-templates";
 import { Search, Sparkles } from "lucide-react";
 import { DishDetailModal } from "./dish-detail-modal";
+import { trackEvent } from "@/lib/meta-pixel";
 
 interface PublicMenuViewProps {
   data: FullRestaurantData;
@@ -16,6 +18,14 @@ export function PublicMenuView({ data }: PublicMenuViewProps) {
   const [selectedFilter, setSelectedFilter] = useState<"all" | "veg" | "non_veg" | "egg" | "jain" | "vegan">("all");
   const [activeCategory, setActiveCategory] = useState<string>(categories[0]?.id || "");
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+
+  useEffect(() => {
+    trackEvent("ViewContent", {
+      content_name: restaurant.name,
+      content_category: "Restaurant Menu",
+      content_ids: [restaurant.id],
+    });
+  }, [restaurant.id, restaurant.name]);
 
   const TemplateComponent = MENU_TEMPLATES[restaurant.template_key] || MENU_TEMPLATES.cafe;
 
@@ -154,13 +164,16 @@ export function PublicMenuView({ data }: PublicMenuViewProps) {
         onClose={() => setSelectedItem(null)}
       />
 
-      {/* Powered by MenuMint Badge */}
+      {/* Powered by ManuMaker Badge */}
       <footer className="py-6 text-center text-xs text-zinc-400 dark:text-zinc-600 border-t border-zinc-200/60 dark:border-zinc-800">
-        <p className="flex items-center justify-center gap-1 font-medium">
+        <Link
+          href="/"
+          className="inline-flex items-center justify-center gap-1.5 font-medium hover:text-emerald-600 transition-colors"
+        >
           <span>Crafted with</span>
-          <span className="font-bold text-zinc-700 dark:text-zinc-300">MenuMint</span>
+          <span className="font-bold text-zinc-700 dark:text-zinc-300">ManuMaker</span>
           <span>• Beautiful digital menus</span>
-        </p>
+        </Link>
       </footer>
     </div>
   );

@@ -12,6 +12,8 @@ import { getAppBaseUrl } from "@/lib/utils";
 import confetti from "canvas-confetti";
 import QRCode from "qrcode";
 import Link from "next/link";
+import { Logo } from "@/components/ui/logo";
+import { trackLead } from "@/lib/meta-pixel";
 import {
   Store,
   Palette,
@@ -34,23 +36,23 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Step 1: Restaurant Info
-  const [restName, setRestName] = useState("Cafe Aroma");
+  // Step 1: Restaurant Info (blank by default, using placeholders)
+  const [restName, setRestName] = useState("");
   const [restType, setRestType] = useState("Café");
-  const [phone, setPhone] = useState("+91 98765 43210");
-  const [whatsapp, setWhatsapp] = useState("+919876543210");
-  const [address, setAddress] = useState("Shop 14, Ground Floor, Indiranagar");
-  const [city, setCity] = useState("Bengaluru");
-  const [state, setState] = useState("Karnataka");
-  const [logoUrl, setLogoUrl] = useState("https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=200&auto=format&fit=crop&q=80");
+  const [phone, setPhone] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
 
   // Step 2: Template Selection
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateKey>("cafe");
 
-  // Step 3: First Category & Item
-  const [categoryName, setCategoryName] = useState("Hot Beverages");
-  const [itemName, setItemName] = useState("Masala Chai");
-  const [itemPrice, setItemPrice] = useState("30");
+  // Step 3: First Category & Item (blank by default, using placeholders)
+  const [categoryName, setCategoryName] = useState("");
+  const [itemName, setItemName] = useState("");
+  const [itemPrice, setItemPrice] = useState("");
   const [foodType, setFoodType] = useState<FoodType>("veg");
 
   // Step 4: Live Celebration
@@ -133,6 +135,7 @@ export default function OnboardingPage() {
         origin: { y: 0.6 },
       });
 
+      trackLead("Onboarding Complete Menu Created");
       setStep(4);
     } catch (err: any) {
       toast(err.message || "Failed to create menu", "error");
@@ -160,8 +163,8 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 py-10 px-4 flex flex-col justify-center items-center">
       {/* Brand Header */}
-      <div className="text-center mb-6">
-        <span className="text-2xl font-black tracking-tight text-emerald-600">MenuMint</span>
+      <div className="text-center mb-6 flex flex-col items-center">
+        <Logo size="lg" className="mb-1" />
         <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
           Restaurant Setup Wizard
         </h1>
@@ -254,7 +257,7 @@ export default function OnboardingPage() {
                   type="text"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+91 98765 43210"
+                  placeholder="e.g. +91 98765 43210"
                   className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
@@ -267,7 +270,7 @@ export default function OnboardingPage() {
                   type="text"
                   value={whatsapp}
                   onChange={(e) => setWhatsapp(e.target.value)}
-                  placeholder="+919876543210"
+                  placeholder="e.g. +91 98765 43210"
                   className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
@@ -281,7 +284,7 @@ export default function OnboardingPage() {
                 type="text"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="Shop 14, Indiranagar 100ft Road"
+                placeholder="e.g. Shop 14, Ground Floor, Indiranagar"
                 className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               />
             </div>
@@ -295,7 +298,7 @@ export default function OnboardingPage() {
                   type="text"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  placeholder="Bengaluru"
+                  placeholder="e.g. Bengaluru"
                   className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
@@ -307,7 +310,7 @@ export default function OnboardingPage() {
                   type="text"
                   value={state}
                   onChange={(e) => setState(e.target.value)}
-                  placeholder="Karnataka"
+                  placeholder="e.g. Karnataka"
                   className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 />
               </div>
@@ -417,7 +420,7 @@ export default function OnboardingPage() {
                     required
                     value={itemPrice}
                     onChange={(e) => setItemPrice(e.target.value)}
-                    placeholder="30"
+                    placeholder="120"
                     className="w-full pl-8 pr-3 py-2.5 text-sm font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>

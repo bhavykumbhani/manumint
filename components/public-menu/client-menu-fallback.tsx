@@ -110,7 +110,7 @@ export function ClientMenuFallback({ slug }: { slug: string }) {
         <Link href="/">
           <Button variant="primary" size="sm">
             <ArrowLeft className="w-4 h-4 mr-1.5" />
-            Go to MenuMint
+            Go to ManuMaker
           </Button>
         </Link>
       </div>

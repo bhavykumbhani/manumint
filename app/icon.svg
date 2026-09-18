@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#059669" />
+      <stop offset="50%" stopColor="#10B981" />
+      <stop offset="100%" stopColor="#0D9488" />
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#FDE68A" />
+      <stop offset="100%" stopColor="#F59E0B" />
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded App Tile -->
+  <rect width="32" height="32" rx="7" fill="url(#bg)" />
+
+  <!-- QR Corner Target Brackets -->
+  <path d="M5 10V6C5 5.44772 5.44772 5 6 5H10" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-opacity="0.85" />
+  <path d="M22 5H26C26.5523 5 27 5.44772 27 6V10" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-opacity="0.85" />
+  <path d="M27 22V26C27 26.5523 26.5523 27 26 27H22" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-opacity="0.85" />
+  <path d="M10 27H6C5.44772 27 5 26.5523 5 26V22" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-opacity="0.85" />
+
+  <!-- Monogram 'M' with Chef Cloche Motif -->
+  <path d="M9.5 22.5V11.5C9.5 11.2239 9.72386 11 10 11H11C11.2761 11 11.5 11.2239 11.5 11.5V22.5" stroke="white" stroke-width="1.8" stroke-linecap="round" />
+  <path d="M11.5 12.5L16 18L20.5 12.5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M20.5 11.5C20.5 11.2239 20.7239 11 21 11H22C22.2761 11 22.5 11.2239 22.5 11.5V22.5" stroke="white" stroke-width="1.8" stroke-linecap="round" />
+
+  <!-- Golden Dome Accent -->
+  <circle cx="16" cy="9" r="1.7" fill="url(#gold)" />
+</svg>

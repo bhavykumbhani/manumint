@@ -7,6 +7,7 @@ import { useMenuStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { UtensilsCrossed, ArrowRight, Sparkles, Lock, Mail } from "lucide-react";
+import { Logo } from "@/components/ui/logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -57,15 +58,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-6">
         {/* Brand Header */}
-        <div className="text-center">
-          <Link href="/" className="inline-flex items-center gap-2 mb-2">
-            <span className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-md">
-              <UtensilsCrossed className="w-5 h-5" />
-            </span>
-            <span className="text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-100">
-              MenuMint
-            </span>
-          </Link>
+        <div className="text-center flex flex-col items-center">
+          <Logo size="lg" className="mb-2" />
           <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mt-2">
             Restaurant Owner Login
           </h2>

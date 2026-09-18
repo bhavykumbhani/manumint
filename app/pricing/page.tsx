@@ -2,21 +2,20 @@
 
 import React from "react";
 import Link from "next/link";
-import { UtensilsCrossed, Check, ArrowRight, Sparkles } from "lucide-react";
+import { Check, ArrowRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/ui/logo";
+import { PricingSchema } from "@/components/seo/structured-data";
+import { trackInitiateCheckout } from "@/lib/meta-pixel";
 
 export default function PricingPage() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 font-sans text-zinc-900 dark:text-zinc-100 flex flex-col justify-between">
+      <PricingSchema />
       {/* Navbar */}
       <header className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-md">
-              <UtensilsCrossed className="w-4 h-4" />
-            </span>
-            <span className="text-lg font-black tracking-tight">MenuMint</span>
-          </Link>
+          <Logo size="md" />
           <div className="flex items-center gap-3">
             <Link href="/login">
               <Button variant="ghost" size="sm">
@@ -84,7 +83,7 @@ export default function PricingPage() {
             </div>
 
             <div className="mt-8">
-              <Link href="/signup">
+              <Link href="/signup" onClick={() => trackInitiateCheckout("Starter Tier", 0)}>
                 <Button variant="outline" className="w-full font-bold">
                   Start Free
                 </Button>
@@ -139,7 +138,7 @@ export default function PricingPage() {
             </div>
 
             <div className="mt-8">
-              <Link href="/signup">
+              <Link href="/signup" onClick={() => trackInitiateCheckout("Pro Tier", 499)}>
                 <Button variant="primary" className="w-full font-bold shadow-md">
                   Get Pro Plan
                   <ArrowRight className="w-4 h-4 ml-1.5" />
@@ -183,7 +182,7 @@ export default function PricingPage() {
             </div>
 
             <div className="mt-8">
-              <Link href="/signup">
+              <Link href="/signup" onClick={() => trackInitiateCheckout("Enterprise Tier", 1499)}>
                 <Button variant="secondary" className="w-full font-bold">
                   Contact Sales
                 </Button>
@@ -195,7 +194,7 @@ export default function PricingPage() {
 
       {/* Footer */}
       <footer className="py-8 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 text-center text-xs text-zinc-500">
-        MenuMint SaaS • Designed for Indian Cafés & Restaurants
+        ManuMaker SaaS • Designed for Indian Cafés & Restaurants
       </footer>
     </div>
   );

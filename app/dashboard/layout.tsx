@@ -20,6 +20,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/ui/logo";
 
 export default function DashboardLayout({
   children,
@@ -39,7 +40,10 @@ export default function DashboardLayout({
         router.push("/login");
       } else if (!restaurant && pathname !== "/dashboard/account" && pathname !== "/onboarding") {
         // Double check if a restaurant exists in localStorage before redirecting to onboarding
-        const storedRests = typeof window !== "undefined" ? localStorage.getItem("menumint_v1_restaurants") : null;
+        // Double check if a restaurant exists in localStorage before redirecting to onboarding
+        const storedRests = typeof window !== "undefined"
+          ? (localStorage.getItem("manumaker_v1_restaurants") || localStorage.getItem("menumint_v1_restaurants"))
+          : null;
         const rList = storedRests ? JSON.parse(storedRests) : [];
         const hasRestaurant = rList.some((r: any) => r.owner_id === user.id || r.owner_id);
         if (!hasRestaurant) {
@@ -70,16 +74,11 @@ export default function DashboardLayout({
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex md:w-64 flex-col bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 shrink-0">
         {/* Brand Header */}
-        <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-md shrink-0">
-            <UtensilsCrossed className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <span className="text-xs font-bold tracking-wider text-emerald-600 uppercase">
-              MenuMint
-            </span>
-            <h1 className="text-sm font-black text-zinc-900 dark:text-zinc-100 truncate">
-              {restaurant?.name || "Restaurant"}
+        <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex flex-col gap-1.5">
+          <Logo size="sm" />
+          <div className="min-w-0 pl-0.5">
+            <h1 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 truncate">
+              {restaurant?.name || "Restaurant Console"}
             </h1>
           </div>
         </div>
@@ -144,15 +143,7 @@ export default function DashboardLayout({
         {/* Mobile Header Bar */}
         <header className="md:hidden bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-4 py-3 flex items-center justify-between z-30">
           <div className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white">
-              <UtensilsCrossed className="w-4 h-4" />
-            </span>
-            <div className="min-w-0">
-              <h2 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
-                {restaurant?.name || "MenuMint"}
-              </h2>
-              <span className="text-[10px] text-zinc-500">Dashboard</span>
-            </div>
+            <Logo size="sm" withLink={false} />
           </div>
 
           <div className="flex items-center gap-2">

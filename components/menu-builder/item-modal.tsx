@@ -25,7 +25,7 @@ export function ItemModal({
   initialCategoryId,
 }: ItemModalProps) {
   const [name, setName] = useState("");
-  const [price, setPrice] = useState<string>("0");
+  const [price, setPrice] = useState<string>("");
   const [categoryId, setCategoryId] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");

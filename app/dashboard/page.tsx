@@ -43,7 +43,7 @@ export default function DashboardOverviewPage() {
         <div className="w-16 h-16 rounded-3xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center mx-auto mb-4 shadow-inner">
           <UtensilsCrossed className="w-8 h-8" />
         </div>
-        <h2 className="text-2xl font-black text-zinc-900 dark:text-zinc-100">Welcome to MenuMint!</h2>
+        <h2 className="text-2xl font-black text-zinc-900 dark:text-zinc-100">Welcome to ManuMaker!</h2>
         <p className="text-xs text-zinc-500 mt-2 mb-6 max-w-sm mx-auto leading-relaxed">
           Your account is active, but you haven&apos;t set up your restaurant profile and menu yet. It only takes 2 minutes!
         </p>

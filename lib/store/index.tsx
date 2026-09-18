@@ -49,7 +49,13 @@ interface MenuStoreContextType {
   refreshData: () => Promise<void>;
 }
 
-const STORAGE_KEY_PREFIX = "menumint_v1";
+const STORAGE_KEY_PREFIX = "manumaker_v1";
+const LEGACY_STORAGE_KEY_PREFIX = "menumint_v1";
+
+const getStorageItem = (key: string): string | null => {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(`${STORAGE_KEY_PREFIX}_${key}`) || localStorage.getItem(`${LEGACY_STORAGE_KEY_PREFIX}_${key}`);
+};
 
 const MenuStoreContext = createContext<MenuStoreContextType | undefined>(undefined);
 
@@ -220,13 +226,13 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
     setIsCloudConnected(cloudAvailable);
 
     try {
-      // Check stored user first
-      const storedUser = localStorage.getItem(`${STORAGE_KEY_PREFIX}_current_user`);
-      const isExplicitlyLoggedOut = localStorage.getItem(`${STORAGE_KEY_PREFIX}_logged_out`) === "true";
-      const storedRests = localStorage.getItem(`${STORAGE_KEY_PREFIX}_restaurants`);
-      const storedCats = localStorage.getItem(`${STORAGE_KEY_PREFIX}_categories`);
-      const storedItms = localStorage.getItem(`${STORAGE_KEY_PREFIX}_items`);
-      const activeRestId = localStorage.getItem(`${STORAGE_KEY_PREFIX}_active_restaurant_id`);
+      // Check stored user first (with legacy menumint fallback)
+      const storedUser = getStorageItem("current_user");
+      const isExplicitlyLoggedOut = getStorageItem("logged_out") === "true";
+      const storedRests = getStorageItem("restaurants");
+      const storedCats = getStorageItem("categories");
+      const storedItms = getStorageItem("items");
+      const activeRestId = getStorageItem("active_restaurant_id");
 
       let rList: Restaurant[] = storedRests ? JSON.parse(storedRests) : [DEMO_RESTAURANT];
       let cList: Category[] = storedCats ? JSON.parse(storedCats) : DEMO_CATEGORIES;
@@ -731,7 +737,7 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
         activeUser = {
           id: `user-${Date.now()}`,
           full_name: "Restaurant Owner",
-          email: "owner@menumint.in",
+          email: "owner@manumaker.in",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
