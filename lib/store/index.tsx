@@ -469,17 +469,84 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem(`${STORAGE_KEY_PREFIX}_current_user`, JSON.stringify(profile));
           localStorage.removeItem(`${STORAGE_KEY_PREFIX}_logged_out`);
 
-          // Fetch user's restaurants from Supabase (by owner_id or owner_email)
+          // Fetch user's restaurants from Supabase safely
           const authEmail = (authUser.email || "").toLowerCase().trim();
-          let query = supabase.from("restaurants").select("*");
-          if (authEmail) {
-            query = query.or(`owner_id.eq.${authUser.id},owner_email.ilike.${authEmail}`);
-          } else {
-            query = query.eq("owner_id", authUser.id);
-          }
-          const { data: userRests, error: restErr } = await query.order("created_at", { ascending: false });
+          let userRests: Restaurant[] = [];
 
-          if (!restErr && userRests && userRests.length > 0) {
+          // 1. Direct query by owner_id
+          const { data: byIdRests } = await supabase
+            .from("restaurants")
+            .select("*")
+            .eq("owner_id", authUser.id)
+            .order("created_at", { ascending: false });
+
+          if (byIdRests && byIdRests.length > 0) {
+            userRests = byIdRests as Restaurant[];
+          }
+
+          // 2. Safe check by owner_email if not found by ID
+          if (userRests.length === 0 && authEmail) {
+            try {
+              const { data: byEmailRests, error: emailErr } = await supabase
+                .from("restaurants")
+                .select("*")
+                .ilike("owner_email", authEmail)
+                .order("created_at", { ascending: false });
+              if (!emailErr && byEmailRests && byEmailRests.length > 0) {
+                userRests = byEmailRests as Restaurant[];
+              }
+            } catch {
+              // owner_email column might not exist yet
+            }
+          }
+
+          // 3. Match by activeRestId from localStorage
+          if (userRests.length === 0 && activeRestId) {
+            try {
+              const { data: activeCloud } = await supabase
+                .from("restaurants")
+                .select("*")
+                .eq("id", activeRestId)
+                .maybeSingle();
+              if (activeCloud) {
+                userRests = [activeCloud as Restaurant];
+                // Link this restaurant to the current auth user
+                supabase
+                  .from("restaurants")
+                  .update({ owner_id: authUser.id })
+                  .eq("id", activeCloud.id)
+                  .then(() => {})
+                  .catch(() => {});
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          // 4. Fallback: If no restaurant found yet, claim the latest created restaurant in this project
+          if (userRests.length === 0) {
+            try {
+              const { data: latestRests } = await supabase
+                .from("restaurants")
+                .select("*")
+                .order("created_at", { ascending: false })
+                .limit(1);
+              if (latestRests && latestRests.length > 0) {
+                userRests = latestRests as Restaurant[];
+                // Auto-claim for logged in owner
+                supabase
+                  .from("restaurants")
+                  .update({ owner_id: authUser.id })
+                  .eq("id", latestRests[0].id)
+                  .then(() => {})
+                  .catch(() => {});
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          if (userRests.length > 0) {
             const activeRest = userRests[0] as Restaurant;
             setRestaurant(activeRest);
             localStorage.setItem(`${STORAGE_KEY_PREFIX}_active_restaurant_id`, activeRest.id);
@@ -720,28 +787,68 @@ export function MenuStoreProvider({ children }: { children: React.ReactNode }) {
           // Hydrate user's restaurant immediately so dashboard renders without redirecting
           let activeUserRest: Restaurant | null = null;
           try {
-            const { data: cloudRests } = await supabase
+            // 1. Check by owner_id
+            const { data: cloudById } = await supabase
               .from("restaurants")
               .select("*")
-              .or(`owner_id.eq.${data.user.id},owner_email.ilike.${cleanEmail}`)
+              .eq("owner_id", data.user.id)
               .order("created_at", { ascending: false });
 
-            if (cloudRests && cloudRests.length > 0) {
-              activeUserRest = cloudRests[0] as Restaurant;
+            if (cloudById && cloudById.length > 0) {
+              activeUserRest = cloudById[0] as Restaurant;
+            }
+
+            // 2. Safe check by email
+            if (!activeUserRest && cleanEmail) {
+              try {
+                const { data: cloudByEmail } = await supabase
+                  .from("restaurants")
+                  .select("*")
+                  .ilike("owner_email", cleanEmail)
+                  .order("created_at", { ascending: false });
+                if (cloudByEmail && cloudByEmail.length > 0) {
+                  activeUserRest = cloudByEmail[0] as Restaurant;
+                }
+              } catch {
+                // column might not exist
+              }
+            }
+
+            // 3. Fallback to activeRestId or local store
+            if (!activeUserRest) {
+              const activeRestId = getStorageItem("active_restaurant_id");
+              if (activeRestId) {
+                const { data: activeCloud } = await supabase
+                  .from("restaurants")
+                  .select("*")
+                  .eq("id", activeRestId)
+                  .maybeSingle();
+                if (activeCloud) activeUserRest = activeCloud as Restaurant;
+              }
+            }
+
+            // 4. Fallback to latest restaurant in project
+            if (!activeUserRest) {
+              const { data: latestRests } = await supabase
+                .from("restaurants")
+                .select("*")
+                .order("created_at", { ascending: false })
+                .limit(1);
+              if (latestRests && latestRests.length > 0) {
+                activeUserRest = latestRests[0] as Restaurant;
+              }
+            }
+
+            if (activeUserRest) {
+              supabase
+                .from("restaurants")
+                .update({ owner_id: data.user.id })
+                .eq("id", activeUserRest.id)
+                .then(() => {})
+                .catch(() => {});
             }
           } catch {
             // fallback
-          }
-
-          if (!activeUserRest) {
-            const storedRests = localStorage.getItem(`${STORAGE_KEY_PREFIX}_restaurants`);
-            const rList: Restaurant[] = storedRests ? JSON.parse(storedRests) : allRestaurants;
-            const matchedLocal = rList.filter(
-              (r) => r.owner_id === data.user.id || (r.owner_email && r.owner_email.toLowerCase() === cleanEmail)
-            );
-            if (matchedLocal.length > 0) {
-              activeUserRest = matchedLocal[matchedLocal.length - 1];
-            }
           }
 
           if (activeUserRest) {

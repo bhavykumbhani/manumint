@@ -38,29 +38,11 @@ export default function DashboardLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // If user is not logged in after loading, redirect to login
-  // If user has no restaurant yet, guide them to onboarding wizard
   React.useEffect(() => {
-    if (!isLoading) {
-      if (!user) {
-        router.push("/login");
-      } else if (!restaurant && pathname !== "/dashboard/account" && pathname !== "/onboarding") {
-        // Double check if a restaurant exists in localStorage before redirecting to onboarding
-        // Double check if a restaurant exists in localStorage before redirecting to onboarding
-        const storedRests = typeof window !== "undefined"
-          ? (localStorage.getItem("manumaker_v1_restaurants") || localStorage.getItem("menumint_v1_restaurants"))
-          : null;
-        const rList = storedRests ? JSON.parse(storedRests) : [];
-        const hasRestaurant = rList.some(
-          (r: any) =>
-            r.owner_id === user.id ||
-            (r.owner_email && user.email && r.owner_email.toLowerCase() === user.email.toLowerCase())
-        );
-        if (!hasRestaurant) {
-          router.push("/onboarding");
-        }
-      }
+    if (!isLoading && !user) {
+      router.push("/login");
     }
-  }, [user, restaurant, isLoading, router, pathname]);
+  }, [user, isLoading, router]);
 
   const { pendingOrdersCount, pendingRequestsCount } = usePos();
   const totalAlerts = pendingOrdersCount + pendingRequestsCount;
