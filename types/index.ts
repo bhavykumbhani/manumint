@@ -90,3 +90,48 @@ export interface FullRestaurantData {
   restaurant: Restaurant;
   categories: (Category & { items: MenuItem[] })[];
 }
+
+export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'served' | 'completed' | 'cancelled';
+export type PaymentStatus = 'unpaid' | 'paid';
+export type PaymentMethod = 'cash' | 'upi' | 'card' | 'pending';
+
+export interface OrderItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  notes?: string;
+}
+
+export interface Order {
+  id: string;
+  restaurant_id: string;
+  order_number: number;
+  table_number: string;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  items: OrderItem[];
+  subtotal: number;
+  tax: number;
+  total_amount: number;
+  status: OrderStatus;
+  payment_status: PaymentStatus;
+  payment_method: PaymentMethod;
+  notes?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export type ServiceRequestType = 'waiter' | 'water' | 'bill' | 'cleaning' | 'other';
+export type ServiceRequestStatus = 'pending' | 'attended';
+
+export interface ServiceRequest {
+  id: string;
+  restaurant_id: string;
+  table_number: string;
+  request_type: ServiceRequestType;
+  status: ServiceRequestStatus;
+  created_at: string;
+  updated_at?: string;
+}
+

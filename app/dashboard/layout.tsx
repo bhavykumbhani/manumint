@@ -19,10 +19,12 @@ import {
   Sparkles,
   ChevronRight,
   Cloud,
+  ChefHat,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { useToast } from "@/components/ui/toast";
+import { usePos } from "@/lib/pos/pos-context";
 
 export default function DashboardLayout({
   children,
@@ -60,8 +62,17 @@ export default function DashboardLayout({
     }
   }, [user, restaurant, isLoading, router, pathname]);
 
+  const { pendingOrdersCount, pendingRequestsCount } = usePos();
+  const totalAlerts = pendingOrdersCount + pendingRequestsCount;
+
   const navItems = [
     { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
+    {
+      label: "Live Orders (POS)",
+      href: "/dashboard/pos",
+      icon: ChefHat,
+      badge: totalAlerts > 0 ? totalAlerts : undefined,
+    },
     { label: "Menu Builder", href: "/dashboard/menu", icon: UtensilsCrossed },
     { label: "Design & Style", href: "/dashboard/design", icon: Palette },
     { label: "QR Code", href: "/dashboard/qr", icon: QrCode },
@@ -105,7 +116,12 @@ export default function DashboardLayout({
                 }`}
               >
                 <item.icon className="w-4 h-4 shrink-0" />
-                <span>{item.label}</span>
+                <span className="flex-1">{item.label}</span>
+                {item.badge !== undefined && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white animate-pulse">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -206,7 +222,12 @@ export default function DashboardLayout({
                   }`}
                 >
                   <item.icon className="w-4 h-4" />
-                  <span>{item.label}</span>
+                  <span className="flex-1">{item.label}</span>
+                  {item.badge !== undefined && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white animate-pulse">
+                      {item.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}

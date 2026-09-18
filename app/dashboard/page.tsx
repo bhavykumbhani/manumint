@@ -20,10 +20,14 @@ import {
   Sparkles,
   Smartphone,
   Palette,
+  ChefHat,
+  BellRing,
 } from "lucide-react";
+import { usePos } from "@/lib/pos/pos-context";
 
 export default function DashboardOverviewPage() {
   const { restaurant, categories, items, publishRestaurant, isLoading } = useMenuStore();
+  const { pendingOrdersCount, pendingRequestsCount } = usePos();
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -149,6 +153,38 @@ export default function DashboardOverviewPage() {
               : "Menu will be visible once published"}
           </span>
         </div>
+      </div>
+
+      {/* Live Orders & POS Alert Card */}
+      <div className="bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-800 text-white rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center shrink-0">
+            <ChefHat className="w-6 h-6 text-emerald-100" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-black tracking-tight">Live POS & Kitchen Orders</h3>
+              {(pendingOrdersCount > 0 || pendingRequestsCount > 0) && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-amber-950 animate-pulse">
+                  {pendingOrdersCount + pendingRequestsCount} Pending Action
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-emerald-100/90 mt-0.5 max-w-xl leading-relaxed">
+              Accept live orders from QR scans, manage kitchen preparation status, handle waiter/water table requests, and print thermal KOT tickets.
+            </p>
+          </div>
+        </div>
+
+        <Link href="/dashboard/pos" className="shrink-0">
+          <Button
+            variant="secondary"
+            size="md"
+            className="w-full sm:w-auto font-bold text-xs bg-white text-emerald-800 hover:bg-emerald-50 border-0 shadow-md"
+          >
+            Open Live POS Console <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+          </Button>
+        </Link>
       </div>
 
       {/* Metrics Row */}

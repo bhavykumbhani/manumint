@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MenuItem, Restaurant } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import {
@@ -15,8 +15,12 @@ import {
   GlassWater,
   Receipt,
   CheckCircle2,
+  ChefHat,
+  Send,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { usePos } from "@/lib/pos/pos-context";
 
 export interface CartItem {
   item: MenuItem;
@@ -38,17 +42,88 @@ export function CartTray({
   onRemoveItem,
   onClearCart,
 }: CartTrayProps) {
+  const { placeOrder, requestService } = usePos();
   const [isOpen, setIsOpen] = useState(false);
   const [isWaiterModalOpen, setIsWaiterModalOpen] = useState(false);
   const [tableNumber, setTableNumber] = useState("");
   const [specialNotes, setSpecialNotes] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Placed Order Success Modal
+  const [placedOrder, setPlacedOrder] = useState<{
+    orderNumber: number;
+    table: string;
+    total: number;
+  } | null>(null);
+
+  // Service Request Feedback
+  const [serviceFeedback, setServiceFeedback] = useState<string | null>(null);
+
+  // Remember table number in session
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedTable = sessionStorage.getItem(`manumaker_table_${restaurant.id}`);
+      if (savedTable) {
+        setTableNumber(savedTable);
+      }
+    }
+  }, [restaurant.id]);
+
+  const handleTableChange = (val: string) => {
+    setTableNumber(val);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(`manumaker_table_${restaurant.id}`, val);
+    }
+  };
 
   const totalItemCount = cart.reduce((acc, curr) => acc + curr.quantity, 0);
   const subtotal = cart.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
   const rawWhatsapp = restaurant.whatsapp ? restaurant.whatsapp.replace(/[^0-9]/g, "") : "";
 
-  // WhatsApp Order Link Generator
-  const handleSendOrder = () => {
+  // 1. Direct Live Order Placement (Sends to Owner POS & Kitchen Display)
+  const handlePlaceLiveOrder = async () => {
+    const cleanTable = tableNumber.trim() || "Dine-In";
+    setIsSubmitting(true);
+
+    try {
+      const newOrder = await placeOrder({
+        restaurant_id: restaurant.id,
+        table_number: cleanTable,
+        customer_name: customerName.trim() || null,
+        items: cart.map((c) => ({
+          id: c.item.id,
+          name: c.item.name,
+          price: c.item.price,
+          quantity: c.quantity,
+        })),
+        subtotal,
+        tax: 0,
+        total_amount: subtotal,
+        status: "pending",
+        payment_status: "unpaid",
+        payment_method: "cash",
+        notes: specialNotes.trim() || null,
+      });
+
+      setPlacedOrder({
+        orderNumber: newOrder.order_number,
+        table: cleanTable,
+        total: subtotal,
+      });
+
+      onClearCart();
+      setIsOpen(false);
+    } catch (err) {
+      console.error("Failed to place order:", err);
+      alert("Could not dispatch order to kitchen. Please try again or notify staff.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 2. WhatsApp Order Backup Generator
+  const handleSendWhatsappBackup = (orderNum?: number) => {
     if (!rawWhatsapp) {
       alert("Restaurant WhatsApp contact is not configured.");
       return;
@@ -65,8 +140,9 @@ export function CartTray({
       .join("\n");
 
     const message = [
-      `🍽️ *NEW ORDER — ${restaurant.name}*`,
+      `🍽️ *NEW ORDER ${orderNum ? `#${orderNum}` : ""} — ${restaurant.name}*`,
       tableNumber ? `📍 *Table / Seating:* Table ${tableNumber}` : `📍 *Order:* Dine-In`,
+      customerName ? `👤 *Customer:* ${customerName}` : "",
       `────────────────────────`,
       itemsSummary,
       `────────────────────────`,
@@ -81,71 +157,77 @@ export function CartTray({
     window.open(waUrl, "_blank");
   };
 
-  // WhatsApp Waiter Call Generator
-  const handleCallWaiter = (type: "waiter" | "water" | "bill") => {
-    if (!rawWhatsapp) {
-      alert("Restaurant WhatsApp contact is not configured.");
-      return;
-    }
+  // 3. Service Call (Waiter, Water, Bill)
+  const handleCallStaff = async (type: "waiter" | "water" | "bill") => {
+    const cleanTable = tableNumber.trim() || "Table (Customer)";
 
-    const serviceTitle =
+    // Send to POS live screen
+    await requestService(restaurant.id, cleanTable, type);
+
+    const title =
       type === "water"
         ? "Drinking Water requested"
         : type === "bill"
-        ? "Final Bill requested"
-        : "Staff assistance requested";
+        ? "Bill requested"
+        : "Waiter call sent";
 
-    const message = [
-      `🛎️ *TABLE SERVICE REQUEST — ${restaurant.name}*`,
-      tableNumber ? `📍 *Table:* Table ${tableNumber}` : `📍 *Table:* Table assistance`,
-      `📌 *Request:* ${serviceTitle}`,
-      `\n_Sent via ManuMaker Contactless Menu_`,
-    ].join("\n");
-
-    const waUrl = `https://wa.me/${rawWhatsapp}?text=${encodeURIComponent(message)}`;
-    window.open(waUrl, "_blank");
+    setServiceFeedback(`✅ ${title} for ${cleanTable}! Staff notified.`);
     setIsWaiterModalOpen(false);
+
+    setTimeout(() => {
+      setServiceFeedback(null);
+    }, 6000);
   };
 
   return (
     <>
+      {/* Service Request Top Notification Banner */}
+      {serviceFeedback && (
+        <div className="fixed top-4 left-4 right-4 z-50 flex justify-center animate-slide-down pointer-events-none">
+          <div className="bg-emerald-600 text-white font-bold text-xs px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 border border-emerald-400/30">
+            <Sparkles className="w-4 h-4 text-emerald-200 shrink-0" />
+            <span>{serviceFeedback}</span>
+          </div>
+        </div>
+      )}
+
       {/* Floating Bottom Bar */}
       <div className="fixed bottom-4 left-0 right-0 z-40 px-4 pointer-events-none flex justify-center">
         <div className="pointer-events-auto flex items-center gap-2 max-w-lg w-full">
           {/* Quick Call Waiter Button */}
-          {restaurant.whatsapp && (
-            <button
-              onClick={() => setIsWaiterModalOpen(true)}
-              className="px-3.5 py-3 rounded-2xl bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-zinc-200 dark:border-zinc-700 shadow-xl text-zinc-800 dark:text-zinc-100 flex items-center gap-2 text-xs font-bold hover:scale-105 active:scale-95 transition-all"
-              title="Call Waiter / Request Bill"
-            >
-              <Bell className="w-4 h-4 text-amber-500 animate-bounce" />
-              <span className="hidden sm:inline">Call Staff</span>
-            </button>
-          )}
+          <button
+            onClick={() => setIsWaiterModalOpen(true)}
+            className="px-3.5 py-3 rounded-2xl bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border border-zinc-200 dark:border-zinc-700 shadow-xl text-zinc-800 dark:text-zinc-100 flex items-center gap-2 text-xs font-bold hover:scale-105 active:scale-95 transition-all"
+            title="Call Waiter / Request Bill"
+          >
+            <Bell className="w-4 h-4 text-amber-500 animate-pulse" />
+            <span className="hidden sm:inline">Call Staff</span>
+          </button>
 
-          {/* Cart Tray Floating Trigger */}
-          {totalItemCount > 0 && (
+          {/* Cart Tray Pill */}
+          {totalItemCount > 0 ? (
             <button
               onClick={() => setIsOpen(true)}
-              className="flex-1 px-4 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-600/30 flex items-center justify-between font-bold text-xs active:scale-[0.98] transition-all"
+              className="flex-1 px-4 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-xl flex items-center justify-between font-bold text-xs transition-all hover:scale-[1.01] active:scale-[0.99]"
             >
               <div className="flex items-center gap-2.5">
-                <div className="w-6 h-6 rounded-full bg-emerald-800/80 flex items-center justify-center text-[11px] font-black">
+                <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center font-mono text-[11px] font-black">
                   {totalItemCount}
                 </div>
                 <span>View Order Tray</span>
               </div>
-              <div className="flex items-center gap-1.5 font-mono text-sm">
-                <span>{formatCurrency(subtotal, restaurant.currency)}</span>
-                <span className="text-emerald-200">→</span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-sm font-black">
+                  {formatCurrency(subtotal, restaurant.currency)}
+                </span>
+                <span className="text-emerald-200 text-xs">➔</span>
               </div>
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
-      {/* Cart Drawer / Modal */}
+      {/* Cart Tray Modal / Drawer */}
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div
@@ -153,25 +235,26 @@ export function CartTray({
             onClick={() => setIsOpen(false)}
           />
 
-          <div className="relative z-10 w-full max-w-lg bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden flex flex-col max-h-[85vh] animate-scale-up">
-            {/* Header */}
-            <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-850/50">
+          <div className="relative z-10 w-full sm:max-w-md bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col max-h-[85vh] animate-slide-up sm:animate-scale-up overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-850/50">
               <div className="flex items-center gap-2">
-                <ShoppingBag className="w-4 h-4 text-emerald-600" />
-                <h3 className="text-sm font-black text-zinc-900 dark:text-zinc-100">
+                <ShoppingBag className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">
                   Your Table Order Tray ({totalItemCount})
                 </h3>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <button
                   onClick={onClearCart}
-                  className="text-[11px] font-semibold text-zinc-400 hover:text-rose-500 transition-colors"
+                  className="p-1.5 text-zinc-400 hover:text-red-500 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title="Clear Cart"
                 >
-                  Clear Tray
+                  <Trash2 className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 flex items-center justify-center hover:scale-105"
+                  className="p-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -228,23 +311,36 @@ export function CartTray({
                   <input
                     type="text"
                     value={tableNumber}
-                    onChange={(e) => setTableNumber(e.target.value)}
+                    onChange={(e) => handleTableChange(e.target.value)}
                     placeholder="e.g. 4"
                     className="w-full px-3 py-1.5 text-xs font-bold bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">
-                    Instructions (Optional)
+                    Your Name (Optional)
                   </label>
                   <input
                     type="text"
-                    value={specialNotes}
-                    onChange={(e) => setSpecialNotes(e.target.value)}
-                    placeholder="e.g. Less spicy, extra sauce"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="e.g. Rahul"
                     className="w-full px-3 py-1.5 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">
+                  Chef Instructions (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={specialNotes}
+                  onChange={(e) => setSpecialNotes(e.target.value)}
+                  placeholder="e.g. Less spicy, Jain preparation, extra tissue"
+                  className="w-full px-3 py-1.5 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
               </div>
 
               {/* Subtotal row */}
@@ -255,15 +351,90 @@ export function CartTray({
                 </span>
               </div>
 
-              {/* Action Button */}
+              {/* Primary Action: Direct to Kitchen POS */}
               <Button
                 variant="primary"
                 size="lg"
-                onClick={handleSendOrder}
-                className="w-full shadow-lg font-bold text-xs"
+                onClick={handlePlaceLiveOrder}
+                isLoading={isSubmitting}
+                className="w-full shadow-lg font-bold text-xs py-3"
               >
-                <MessageCircle className="w-4 h-4 mr-2" />
-                Send Order to Kitchen via WhatsApp
+                <ChefHat className="w-4 h-4 mr-2" />
+                Place Order (Send to Kitchen)
+              </Button>
+
+              {/* Secondary WhatsApp option */}
+              {rawWhatsapp && (
+                <button
+                  type="button"
+                  onClick={() => handleSendWhatsappBackup()}
+                  className="w-full py-2 text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Or send via WhatsApp instead</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order Placed Success Modal */}
+      {placedOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+            onClick={() => setPlacedOrder(null)}
+          />
+
+          <div className="relative z-10 w-full max-w-sm bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 p-6 text-center space-y-4 animate-scale-up">
+            <div className="w-16 h-16 rounded-3xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-1">
+              <div className="inline-block px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 font-mono text-xs font-bold">
+                Order #{placedOrder.orderNumber}
+              </div>
+              <h3 className="text-lg font-black text-zinc-900 dark:text-zinc-100">
+                Order Sent to Kitchen!
+              </h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                Your order for <span className="font-bold text-zinc-800 dark:text-zinc-200">{placedOrder.table}</span> has been received on the restaurant POS screen.
+              </p>
+            </div>
+
+            <div className="p-3 bg-zinc-50 dark:bg-zinc-850 rounded-2xl border border-zinc-100 dark:border-zinc-800 text-left text-xs space-y-1">
+              <div className="flex justify-between text-zinc-500 font-medium">
+                <span>Total Amount:</span>
+                <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">
+                  {formatCurrency(placedOrder.total, restaurant.currency)}
+                </span>
+              </div>
+              <div className="flex justify-between text-zinc-500 font-medium">
+                <span>Payment:</span>
+                <span className="text-amber-600 font-semibold">Pay at counter or on table</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              {rawWhatsapp && (
+                <button
+                  onClick={() => handleSendWhatsappBackup(placedOrder.orderNumber)}
+                  className="w-full py-2.5 px-4 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center justify-center gap-2 transition-all"
+                >
+                  <MessageCircle className="w-4 h-4 text-emerald-500" />
+                  <span>Send receipt copy to WhatsApp</span>
+                </button>
+              )}
+
+              <Button
+                variant="primary"
+                size="md"
+                className="w-full font-bold text-xs"
+                onClick={() => setPlacedOrder(null)}
+              >
+                Done / Order More
               </Button>
             </div>
           </div>
@@ -296,12 +467,12 @@ export function CartTray({
 
             <div>
               <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                Your Table Number
+                Your Table Number *
               </label>
               <input
                 type="text"
                 value={tableNumber}
-                onChange={(e) => setTableNumber(e.target.value)}
+                onChange={(e) => handleTableChange(e.target.value)}
                 placeholder="e.g. Table 5"
                 className="w-full px-3.5 py-2 text-xs font-semibold bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               />
@@ -309,7 +480,7 @@ export function CartTray({
 
             <div className="space-y-2 pt-1">
               <button
-                onClick={() => handleCallWaiter("waiter")}
+                onClick={() => handleCallStaff("waiter")}
                 className="w-full p-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:border-amber-500 hover:bg-amber-50/50 dark:hover:bg-amber-950/30 flex items-center gap-3 transition-all text-left"
               >
                 <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
@@ -317,12 +488,12 @@ export function CartTray({
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Call Waiter to Table</h4>
-                  <p className="text-[11px] text-zinc-500">Need assistance or recommendations</p>
+                  <p className="text-[11px] text-zinc-500">Need assistance or ordering help</p>
                 </div>
               </button>
 
               <button
-                onClick={() => handleCallWaiter("water")}
+                onClick={() => handleCallStaff("water")}
                 className="w-full p-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 flex items-center gap-3 transition-all text-left"
               >
                 <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center shrink-0">
@@ -330,12 +501,12 @@ export function CartTray({
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-zinc-900 dark:text-zinc-100">Request Water</h4>
-                  <p className="text-[11px] text-zinc-500">Bottled or drinking water</p>
+                  <p className="text-[11px] text-zinc-500">Drinking water / glasses</p>
                 </div>
               </button>
 
               <button
-                onClick={() => handleCallWaiter("bill")}
+                onClick={() => handleCallStaff("bill")}
                 className="w-full p-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 flex items-center gap-3 transition-all text-left"
               >
                 <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center shrink-0">

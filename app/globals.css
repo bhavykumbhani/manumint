@@ -127,9 +127,11 @@ body {
     visibility: hidden;
   }
 
-  /* Make printable standee and all its children visible */
+  /* Make printable standee or KOT visible */
   #printable-standee,
-  #printable-standee * {
+  #printable-standee *,
+  #printable-kot,
+  #printable-kot * {
     visibility: visible !important;
   }
 
@@ -143,6 +145,23 @@ body {
     border: 2px solid #71717a !important;
     background: #ffffff !important;
     color: #09090b !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Thermal KOT (Kitchen Order Ticket) receipt layout */
+  #printable-kot {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 300px !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: monospace !important;
+    padding: 12px !important;
+    border: 1px dashed #000000 !important;
     page-break-inside: avoid !important;
   }
 }

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { MenuStoreProvider } from "@/lib/store";
+import { PosProvider } from "@/lib/pos/pos-context";
 import { ToastProvider } from "@/components/ui/toast";
 import { MetaPixel } from "@/components/analytics/meta-pixel";
 import { OrganizationSchema } from "@/components/seo/structured-data";
@@ -90,7 +91,9 @@ export default function RootLayout({
         <OrganizationSchema />
         <MetaPixel />
         <MenuStoreProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <PosProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </PosProvider>
         </MenuStoreProvider>
       </body>
     </html>
