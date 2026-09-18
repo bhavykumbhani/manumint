@@ -89,31 +89,44 @@ export function DesignView() {
                   <div
                     key={tmpl.key}
                     onClick={() => handleSelectTemplate(tmpl.key)}
-                    className={`cursor-pointer rounded-2xl p-4 border-2 transition-all flex flex-col justify-between relative overflow-hidden ${
+                    className={`cursor-pointer rounded-2xl border-2 transition-all flex flex-col justify-between overflow-hidden group relative ${
                       isSelected
                         ? "border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/20 shadow-md ring-1 ring-emerald-500"
-                        : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-850/50"
+                        : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-850"
                     }`}
                   >
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
-                          {tmpl.badge}
-                        </span>
-                        {isSelected && (
-                          <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                            <Check className="w-4 h-4" /> Selected
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{tmpl.name}</h3>
-                      <p className="text-xs text-zinc-500 mt-1 leading-relaxed">{tmpl.description}</p>
+                    {/* Visual Preview Image Banner */}
+                    <div className="relative h-32 w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+                      <img
+                        src={tmpl.previewImage}
+                        alt={tmpl.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                      <span className="absolute top-2 left-2 text-[9px] font-extrabold uppercase tracking-wider bg-white/95 dark:bg-zinc-900/90 text-zinc-900 dark:text-white px-2.5 py-0.5 rounded-md shadow-xs backdrop-blur-xs">
+                        {tmpl.badge}
+                      </span>
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center gap-1 shadow-md">
+                          <Check className="w-3 h-3 stroke-[3]" /> Active
+                        </div>
+                      )}
+                      <span className="absolute bottom-2 left-3 text-[11px] font-bold text-white/95 drop-shadow-sm">
+                        {tmpl.vibe}
+                      </span>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-zinc-200/60 dark:border-zinc-800 flex items-center justify-between text-xs">
-                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                        {isSelected ? "Active on your menu" : "Click to apply"}
-                      </span>
+                    <div className="p-4 flex-1 flex flex-col justify-between">
+                      <div>
+                        <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{tmpl.name}</h3>
+                        <p className="text-xs text-zinc-500 mt-1 leading-relaxed">{tmpl.description}</p>
+                      </div>
+
+                      <div className="mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs">
+                        <span className={`font-semibold text-[11px] ${isSelected ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-200"}`}>
+                          {isSelected ? "✓ Currently Active" : "Click to apply"}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 );

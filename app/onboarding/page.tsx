@@ -206,7 +206,11 @@ export default function OnboardingPage() {
       </div>
 
       {/* Step Containers */}
-      <div className="w-full max-w-xl bg-white dark:bg-zinc-900 rounded-3xl p-6 sm:p-8 border border-zinc-200 dark:border-zinc-800 shadow-xl">
+      <div
+        className={`w-full ${
+          step === 2 ? "max-w-4xl" : "max-w-xl"
+        } bg-white dark:bg-zinc-900 rounded-3xl p-6 sm:p-8 border border-zinc-200 dark:border-zinc-800 shadow-xl transition-all duration-300`}
+      >
         {/* STEP 1: Restaurant Info */}
         {step === 1 && (
           <form onSubmit={handleNextFromStep1} className="space-y-4">
@@ -325,39 +329,72 @@ export default function OnboardingPage() {
           </form>
         )}
 
-        {/* STEP 2: Choose Template */}
+        {/* STEP 2: Choose Template with Image Previews */}
         {step === 2 && (
           <div className="space-y-4">
             <div>
-              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Step 2: Choose Menu Style</h2>
-              <p className="text-xs text-zinc-500">Select an aesthetic that fits your establishment. You can switch anytime.</p>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Step 2: Choose Menu Style</h2>
+                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                  9 Premium Styles Available
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Every style renders your exact dishes with unique animations, colors, and layout. Switch anytime!
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 pt-2">
               {TEMPLATE_METAS.map((tmpl) => {
                 const isSelected = selectedTemplate === tmpl.key;
                 return (
                   <div
                     key={tmpl.key}
                     onClick={() => setSelectedTemplate(tmpl.key)}
-                    className={`cursor-pointer p-4 rounded-2xl border-2 transition-all ${
+                    className={`cursor-pointer rounded-2xl border-2 transition-all flex flex-col overflow-hidden group relative ${
                       isSelected
-                        ? "border-emerald-600 bg-emerald-50/20 dark:bg-emerald-950/20 shadow-md ring-1 ring-emerald-500"
-                        : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300"
+                        ? "border-emerald-600 bg-emerald-50/20 dark:bg-emerald-950/20 shadow-md ring-2 ring-emerald-500"
+                        : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white dark:bg-zinc-850"
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400">{tmpl.badge}</span>
-                      {isSelected && <Check className="w-4 h-4 text-emerald-600" />}
+                    {/* Visual Preview Image Banner */}
+                    <div className="relative h-28 w-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+                      <img
+                        src={tmpl.previewImage}
+                        alt={tmpl.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                      <span className="absolute top-2 left-2 text-[9px] font-extrabold uppercase tracking-wider bg-white/95 dark:bg-zinc-900/90 text-zinc-900 dark:text-white px-2 py-0.5 rounded-md shadow-xs backdrop-blur-xs">
+                        {tmpl.badge}
+                      </span>
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md">
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        </div>
+                      )}
+                      <span className="absolute bottom-1.5 left-2.5 text-[10px] font-bold text-white/90 drop-shadow-sm">
+                        {tmpl.vibe}
+                      </span>
                     </div>
-                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">{tmpl.name}</h3>
-                    <p className="text-xs text-zinc-500 mt-1">{tmpl.description}</p>
+
+                    {/* Details */}
+                    <div className="p-3 flex-1 flex flex-col justify-between">
+                      <div>
+                        <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                          {tmpl.name}
+                        </h3>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2 leading-relaxed">
+                          {tmpl.description}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
             </div>
 
-            <div className="pt-4 flex items-center justify-between">
+            <div className="pt-4 flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800">
               <Button type="button" variant="outline" onClick={() => setStep(1)}>
                 <ArrowLeft className="w-4 h-4 mr-1.5" /> Back
               </Button>

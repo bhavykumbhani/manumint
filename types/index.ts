@@ -1,6 +1,15 @@
 export type FoodType = 'veg' | 'non_veg' | 'egg';
 
-export type TemplateKey = 'minimal' | 'cafe' | 'modern_dark' | 'elegant';
+export type TemplateKey =
+  | 'minimal'
+  | 'cafe'
+  | 'modern_dark'
+  | 'elegant'
+  | 'street_bites'
+  | 'royal_heritage'
+  | 'retro_diner'
+  | 'neon_lounge'
+  | 'botanical_garden';
 
 export interface Profile {
   id: string;

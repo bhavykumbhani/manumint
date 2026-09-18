@@ -271,7 +271,7 @@ export default function LandingPage() {
               </div>
               <h3 className="text-lg font-bold text-zinc-900 mb-2">Choose your style</h3>
               <p className="text-xs text-zinc-600 leading-relaxed">
-                Pick from 4 distinctive designer templates: Minimal, Café, Modern Dark, or Elegant. Customize colors to match your restaurant interior.
+                Pick from 9 distinctive designer templates (Café, Minimal, Street Food, Royal Heritage, Retro Diner, Neon Lounge, and more). Customize colors anytime!
               </p>
             </div>
 
@@ -296,26 +296,42 @@ export default function LandingPage() {
               Curated Hospitality Aesthetics
             </span>
             <h2 className="text-3xl sm:text-4xl font-black text-zinc-950 mt-2">
-              4 templates designed for every dining style
+              9 templates designed for every dining style
             </h2>
             <p className="text-sm text-zinc-600 mt-2">
-              All templates consume your structured data. Switch themes anytime without re-entering dishes.
+              All templates consume your structured dishes and categories. Switch themes anytime without re-entering data.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {TEMPLATE_METAS.map((tmpl) => (
               <div
                 key={tmpl.key}
-                className="rounded-3xl border border-zinc-200 overflow-hidden shadow-xs flex flex-col justify-between bg-zinc-50"
+                className="rounded-3xl border border-zinc-200 overflow-hidden shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between bg-zinc-50 group"
               >
-                <div className="p-6">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                {/* Visual Preview Image Header */}
+                <div className="relative h-44 w-full overflow-hidden bg-zinc-200">
+                  <img
+                    src={tmpl.previewImage}
+                    alt={tmpl.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+                  <span className="absolute top-3 left-3 text-[10px] font-black uppercase tracking-wider bg-white/95 text-zinc-900 px-2.5 py-0.5 rounded-md shadow-xs">
                     {tmpl.badge}
                   </span>
-                  <h3 className="text-base font-bold text-zinc-900 mt-3">{tmpl.name}</h3>
-                  <p className="text-xs text-zinc-500 mt-1.5 leading-relaxed">{tmpl.description}</p>
+                  <span className="absolute bottom-2.5 left-3.5 text-xs font-bold text-white/95 drop-shadow-sm">
+                    {tmpl.vibe}
+                  </span>
                 </div>
+
+                <div className="p-5 flex-1 flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-base font-bold text-zinc-900">{tmpl.name}</h3>
+                    <p className="text-xs text-zinc-500 mt-1.5 leading-relaxed">{tmpl.description}</p>
+                  </div>
+                </div>
+
                 <div className="p-4 bg-white border-t border-zinc-200/80 flex items-center justify-between">
                   <Link href={`/menu/cafe-aroma`} target="_blank" className="text-xs font-semibold text-emerald-600 hover:underline flex items-center gap-1">
                     Preview in browser <ExternalLink className="w-3.5 h-3.5" />
