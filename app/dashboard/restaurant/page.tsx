@@ -5,8 +5,9 @@ import { useMenuStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
-import { Store, Globe, Phone, MessageCircle, MapPin, Sparkles, CheckCircle2 } from "lucide-react";
+import { Store, Globe, Phone, MessageCircle, MapPin, Sparkles, CheckCircle2, Check } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
+import { RestaurantDietaryType } from "@/types";
 
 export default function RestaurantSettingsPage() {
   const { restaurant, updateRestaurant } = useMenuStore();
@@ -15,6 +16,7 @@ export default function RestaurantSettingsPage() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [restaurantType, setRestaurantType] = useState("Café");
+  const [dietaryType, setDietaryType] = useState<RestaurantDietaryType>("both");
   const [description, setDescription] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
@@ -33,6 +35,7 @@ export default function RestaurantSettingsPage() {
       setName(restaurant.name);
       setSlug(restaurant.slug);
       setRestaurantType(restaurant.restaurant_type);
+      setDietaryType(restaurant.dietary_type || "both");
       setDescription(restaurant.description || "");
       setLogoUrl(restaurant.logo_url || "");
       setCoverImageUrl(restaurant.cover_image_url || "");
@@ -66,6 +69,7 @@ export default function RestaurantSettingsPage() {
       await updateRestaurant({
         name: name.trim(),
         restaurant_type: restaurantType,
+        dietary_type: dietaryType,
         description: description.trim() || null,
         logo_url: logoUrl.trim() || null,
         cover_image_url: coverImageUrl.trim() || null,
@@ -176,6 +180,82 @@ export default function RestaurantSettingsPage() {
               </select>
             </div>
           </div>
+
+          {/* Dietary Kitchen Standard */}
+          <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  Dietary Kitchen Standard (Customer Trust & FSSAI)
+                </label>
+                <p className="text-[11px] text-zinc-500">
+                  Controls dietary filter pills and vegetarian trust badges on your public menu.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                {
+                  type: "pure_veg" as const,
+                  badge: "100% Pure Veg",
+                  icon: "🌱",
+                  title: "Pure Veg",
+                  desc: "Strictly vegetarian kitchen. Non-Veg and Egg filters are completely removed from customer view.",
+                },
+                {
+                  type: "both" as const,
+                  badge: "Dual Menu",
+                  icon: "🥗🍗",
+                  title: "Veg & Non-Veg (Mix)",
+                  desc: "Serves both vegetarian and non-vegetarian dishes. All dietary filter pills are shown.",
+                },
+                {
+                  type: "non_veg" as const,
+                  badge: "Specialty",
+                  icon: "🍗",
+                  title: "Non-Veg Specialty",
+                  desc: "Specializes in non-vegetarian cuisine, grills, meat, and seafood.",
+                },
+              ].map((opt) => {
+                const isSelected = dietaryType === opt.type;
+                return (
+                  <button
+                    key={opt.type}
+                    type="button"
+                    onClick={() => setDietaryType(opt.type)}
+                    className={`p-3.5 rounded-2xl border text-left transition-all duration-200 relative flex flex-col justify-between ${
+                      isSelected
+                        ? "border-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/40 ring-2 ring-emerald-500 shadow-xs scale-[1.01]"
+                        : "border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 hover:border-zinc-300 dark:hover:border-zinc-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-2xl">{opt.icon}</span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isSelected
+                            ? "bg-emerald-600 text-white"
+                            : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300"
+                        }`}
+                      >
+                        {opt.badge}
+                      </span>
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
+                        {opt.title}
+                        {isSelected && <Check className="w-4 h-4 text-emerald-600" />}
+                      </div>
+                      <p className="text-[11px] text-zinc-500 leading-snug mt-1">
+                        {opt.desc}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
 
           <div>
             <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">

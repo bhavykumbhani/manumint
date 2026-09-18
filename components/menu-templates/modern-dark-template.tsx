@@ -2,7 +2,7 @@
 
 import React from "react";
 import { TemplateProps } from "./types";
-import { FoodIndicator, DietaryBadges } from "@/components/ui/food-indicator";
+import { FoodIndicator, DietaryBadges, EstablishmentDietaryBadge } from "@/components/ui/food-indicator";
 import { formatCurrency } from "@/lib/utils";
 import { Phone, MapPin, MessageCircle, Sparkles, ChevronRight, Eye } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
@@ -31,10 +31,11 @@ export function ModernDarkTemplate({
         )}
 
         <h1 className="text-2xl font-black tracking-tight text-white">{restaurant.name}</h1>
-        <div className="flex items-center justify-center gap-2 mt-1.5">
+        <div className="flex flex-wrap items-center justify-center gap-2 mt-1.5">
           <span className="text-[10px] font-mono tracking-widest text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2.5 py-0.5 rounded-full uppercase">
             {restaurant.restaurant_type || "Modern Kitchen & Bar"}
           </span>
+          <EstablishmentDietaryBadge dietaryType={restaurant.dietary_type} />
         </div>
 
         {restaurant.description && (

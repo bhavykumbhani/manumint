@@ -2,7 +2,7 @@
 
 import React from "react";
 import { TemplateProps } from "./types";
-import { FoodIndicator, DietaryBadges } from "@/components/ui/food-indicator";
+import { FoodIndicator, DietaryBadges, EstablishmentDietaryBadge } from "@/components/ui/food-indicator";
 import { formatCurrency } from "@/lib/utils";
 import { Phone, MapPin, MessageCircle, ChevronRight, Eye } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
@@ -27,6 +27,9 @@ export function MinimalTemplate({
         <p className="text-[10px] font-mono tracking-widest text-zinc-400 uppercase mt-1">
           {restaurant.restaurant_type || "Contemporary Dining"}
         </p>
+        <div className="mt-2 flex justify-center">
+          <EstablishmentDietaryBadge dietaryType={restaurant.dietary_type} />
+        </div>
 
         {restaurant.description && (
           <p className="text-xs text-zinc-500 max-w-sm mx-auto mt-2 leading-relaxed">

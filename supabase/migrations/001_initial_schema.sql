@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS public.restaurants (
   slug TEXT UNIQUE NOT NULL,
   description TEXT,
   restaurant_type TEXT NOT NULL DEFAULT 'Café',
+  dietary_type TEXT NOT NULL DEFAULT 'both',
   logo_url TEXT,
   cover_image_url TEXT,
   phone TEXT,
@@ -225,3 +226,7 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Ensure dietary_type exists on pre-existing tables
+ALTER TABLE public.restaurants ADD COLUMN IF NOT EXISTS dietary_type TEXT DEFAULT 'both';
+

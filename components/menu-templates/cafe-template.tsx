@@ -2,7 +2,7 @@
 
 import React from "react";
 import { TemplateProps } from "./types";
-import { FoodIndicator, DietaryBadges } from "@/components/ui/food-indicator";
+import { FoodIndicator, DietaryBadges, EstablishmentDietaryBadge } from "@/components/ui/food-indicator";
 import { formatCurrency } from "@/lib/utils";
 import { Phone, MapPin, MessageCircle, Coffee, Sparkles, ChevronRight, Eye } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
@@ -49,14 +49,12 @@ export function CafeTemplate({
           )}
 
           <h1 className="text-2xl font-black text-amber-950 mt-1 tracking-tight">{restaurant.name}</h1>
-          <div className="flex items-center justify-center gap-2 mt-1">
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
             <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100/90 px-3 py-0.5 rounded-full shadow-2xs">
               <Sparkles className="w-3 h-3 text-amber-600" />
               {restaurant.restaurant_type || "Artisanal Café"}
             </span>
-            <span className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-              ● Fresh Menu
-            </span>
+            <EstablishmentDietaryBadge dietaryType={restaurant.dietary_type} />
           </div>
 
           {restaurant.description && (

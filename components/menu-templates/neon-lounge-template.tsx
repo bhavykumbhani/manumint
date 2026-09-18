@@ -2,7 +2,7 @@
 
 import React from "react";
 import { TemplateProps } from "./types";
-import { FoodIndicator, DietaryBadges } from "@/components/ui/food-indicator";
+import { FoodIndicator, DietaryBadges, EstablishmentDietaryBadge } from "@/components/ui/food-indicator";
 import { formatCurrency } from "@/lib/utils";
 import { Phone, MapPin, MessageCircle, GlassWater, Sparkles, ChevronRight, Moon } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
@@ -62,6 +62,10 @@ export function NeonLoungeTemplate({
           <p className="text-xs text-zinc-400 mt-1 font-semibold">
             {restaurant.restaurant_type || "Bar, Kitchen & Lounge"}
           </p>
+
+          <div className="flex justify-center mt-2">
+            <EstablishmentDietaryBadge dietaryType={restaurant.dietary_type} />
+          </div>
 
           {restaurant.description && (
             <p className="text-xs text-zinc-400 mt-2.5 max-w-md mx-auto leading-relaxed">

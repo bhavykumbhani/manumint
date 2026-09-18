@@ -2,7 +2,7 @@
 
 import React from "react";
 import { TemplateProps } from "./types";
-import { FoodIndicator, DietaryBadges } from "@/components/ui/food-indicator";
+import { FoodIndicator, DietaryBadges, EstablishmentDietaryBadge } from "@/components/ui/food-indicator";
 import { formatCurrency } from "@/lib/utils";
 import { Phone, MapPin, MessageCircle, Leaf, Sparkles, ChevronRight, Sprout } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
@@ -65,6 +65,10 @@ export function BotanicalGardenTemplate({
           <p className="text-xs text-emerald-800/80 mt-1 font-semibold">
             {restaurant.restaurant_type || "Botanical Kitchen & Salad Bar"}
           </p>
+
+          <div className="flex justify-center mt-2">
+            <EstablishmentDietaryBadge dietaryType={restaurant.dietary_type} />
+          </div>
 
           {restaurant.description && (
             <p className="text-xs text-emerald-900/70 mt-2.5 max-w-md mx-auto leading-relaxed">

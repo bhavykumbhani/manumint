@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useMenuStore } from "@/lib/store";
 import { Category, MenuItem } from "@/types";
-import { FoodIndicator, DietaryBadges } from "@/components/ui/food-indicator";
+import { FoodIndicator, DietaryBadges, EstablishmentDietaryBadge } from "@/components/ui/food-indicator";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -151,7 +151,10 @@ export function MenuBuilderView() {
           {/* Action Header */}
           <div className="flex items-center justify-between bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xs">
             <div>
-              <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Categories & Dishes</h2>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Categories & Dishes</h2>
+                {restaurant && <EstablishmentDietaryBadge dietaryType={restaurant.dietary_type} />}
+              </div>
               <p className="text-xs text-zinc-500 mt-0.5">
                 {categories.length} {categories.length === 1 ? "category" : "categories"} • {items.length} dishes
               </p>

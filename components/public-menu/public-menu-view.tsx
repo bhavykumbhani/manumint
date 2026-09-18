@@ -29,11 +29,17 @@ export function PublicMenuView({ data }: PublicMenuViewProps) {
 
   const TemplateComponent = MENU_TEMPLATES[restaurant.template_key] || MENU_TEMPLATES.cafe;
 
+  const isPureVeg = restaurant.dietary_type === "pure_veg";
+  const isNonVegSpecialty = restaurant.dietary_type === "non_veg";
+
   // Filter items based on client-side search & dietary pills
   const filteredCategories = useMemo(() => {
     return categories
       .map((cat) => {
         const catItems = cat.items.filter((item) => {
+          // Strictly protect Pure Veg integrity
+          if (isPureVeg && item.food_type === "non_veg") return false;
+
           // Dietary Filter
           if (selectedFilter === "veg" && item.food_type !== "veg") return false;
           if (selectedFilter === "non_veg" && item.food_type !== "non_veg") return false;
@@ -57,7 +63,34 @@ export function PublicMenuView({ data }: PublicMenuViewProps) {
         };
       })
       .filter((cat) => cat.items.length > 0 || !searchQuery.trim());
-  }, [categories, searchQuery, selectedFilter]);
+  }, [categories, searchQuery, selectedFilter, isPureVeg]);
+
+  const filterOptions = useMemo(() => {
+    if (isPureVeg) {
+      return [
+        { key: "all" as const, label: "All Items" },
+        { key: "veg" as const, label: "🌱 100% Veg" },
+        { key: "jain" as const, label: "Jain Friendly" },
+        { key: "vegan" as const, label: "Vegan" },
+      ];
+    }
+    if (isNonVegSpecialty) {
+      return [
+        { key: "all" as const, label: "All Items" },
+        { key: "non_veg" as const, label: "🍗 Non-Veg" },
+        { key: "egg" as const, label: "🥚 Egg" },
+        { key: "veg" as const, label: "🌱 Veg" },
+      ];
+    }
+    return [
+      { key: "all" as const, label: "All Items" },
+      { key: "veg" as const, label: "🌱 Veg" },
+      { key: "non_veg" as const, label: "🍗 Non-Veg" },
+      { key: "egg" as const, label: "🥚 Egg" },
+      { key: "jain" as const, label: "Jain Friendly" },
+      { key: "vegan" as const, label: "Vegan" },
+    ];
+  }, [isPureVeg, isNonVegSpecialty]);
 
   const scrollToCategory = (catId: string) => {
     setActiveCategory(catId);
@@ -72,7 +105,18 @@ export function PublicMenuView({ data }: PublicMenuViewProps) {
       <div>
         {/* Sticky Customer Search & Filter Bar */}
         <div className="sticky top-0 z-40 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-b border-zinc-200/80 dark:border-zinc-800 shadow-xs transition-all">
-          <div className="max-w-xl mx-auto px-4 py-2.5 space-y-2.5">
+          <div className="max-w-xl mx-auto px-4 py-2.5 space-y-2">
+            {/* Pure Veg Assurance Banner for complete customer trust */}
+            {isPureVeg && (
+              <div className="flex items-center justify-between px-1 text-[11px]">
+                <span className="inline-flex items-center gap-1.5 font-black text-emerald-700 dark:text-emerald-400">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                  🌱 100% Pure Vegetarian Kitchen
+                </span>
+                <span className="text-zinc-400 text-[10px] font-medium">Pure Veg Assurance</span>
+              </div>
+            )}
+
             {/* Search Input with Clear Button */}
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
@@ -95,16 +139,7 @@ export function PublicMenuView({ data }: PublicMenuViewProps) {
 
             {/* Dietary Filter Pills with smooth selection bounce */}
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-              {(
-                [
-                  { key: "all", label: "All Items" },
-                  { key: "veg", label: "🌱 Veg" },
-                  { key: "non_veg", label: "🍗 Non-Veg" },
-                  { key: "egg", label: "🥚 Egg" },
-                  { key: "jain", label: "Jain Friendly" },
-                  { key: "vegan", label: "Vegan" },
-                ] as const
-              ).map((f) => {
+              {filterOptions.map((f) => {
                 const isActive = selectedFilter === f.key;
                 return (
                   <button

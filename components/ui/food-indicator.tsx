@@ -93,3 +93,44 @@ export function DietaryBadges({
     </div>
   );
 }
+
+export function EstablishmentDietaryBadge({
+  dietaryType,
+  className = "",
+}: {
+  dietaryType?: "pure_veg" | "non_veg" | "both" | string;
+  className?: string;
+}) {
+  if (dietaryType === "pure_veg") {
+    return (
+      <span
+        title="100% Pure Vegetarian Establishment"
+        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-400/80 shadow-2xs ${className}`}
+      >
+        <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+        🌱 100% Pure Veg
+      </span>
+    );
+  }
+
+  if (dietaryType === "non_veg") {
+    return (
+      <span
+        title="Non-Vegetarian Specialties"
+        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-300 shadow-2xs ${className}`}
+      >
+        🍗 Non-Veg Specialty
+      </span>
+    );
+  }
+
+  return (
+    <span
+      title="Serves Vegetarian & Non-Vegetarian Options"
+      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 ${className}`}
+    >
+      🥗🍗 Veg & Non-Veg
+    </span>
+  );
+}
+

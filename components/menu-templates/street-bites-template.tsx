@@ -2,7 +2,7 @@
 
 import React from "react";
 import { TemplateProps } from "./types";
-import { FoodIndicator, DietaryBadges } from "@/components/ui/food-indicator";
+import { FoodIndicator, DietaryBadges, EstablishmentDietaryBadge } from "@/components/ui/food-indicator";
 import { formatCurrency } from "@/lib/utils";
 import { Phone, MapPin, MessageCircle, Flame, Sparkles, ChevronRight, Zap } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
@@ -56,9 +56,7 @@ export function StreetBitesTemplate({
               <Zap className="w-3 h-3 text-orange-600 fill-orange-500" />
               {restaurant.restaurant_type || "Fast Bites & Street Food"}
             </span>
-            <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-              ● Fast Delivery & Dine-In
-            </span>
+            <EstablishmentDietaryBadge dietaryType={restaurant.dietary_type} />
           </div>
 
           {restaurant.description && (

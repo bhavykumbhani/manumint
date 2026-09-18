@@ -2,7 +2,7 @@
 
 import React from "react";
 import { TemplateProps } from "./types";
-import { FoodIndicator, DietaryBadges } from "@/components/ui/food-indicator";
+import { FoodIndicator, DietaryBadges, EstablishmentDietaryBadge } from "@/components/ui/food-indicator";
 import { formatCurrency } from "@/lib/utils";
 import { Phone, MapPin, MessageCircle, Utensils, Sparkles, ChevronRight, Star } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
@@ -67,6 +67,10 @@ export function RetroDinerTemplate({
           <p className="text-xs text-zinc-500 font-semibold mt-1">
             {restaurant.restaurant_type || "Classic Diner & Pizzeria"}
           </p>
+
+          <div className="flex justify-center mt-2">
+            <EstablishmentDietaryBadge dietaryType={restaurant.dietary_type} />
+          </div>
 
           {restaurant.description && (
             <p className="text-xs text-zinc-600 mt-2 max-w-md mx-auto leading-relaxed font-medium">

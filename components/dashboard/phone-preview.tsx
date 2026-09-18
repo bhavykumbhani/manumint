@@ -14,10 +14,12 @@ interface PhonePreviewProps {
 
 export function PhonePreview({ restaurant, categories, items }: PhonePreviewProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedFilter, setSelectedFilter] = useState<"all" | "veg" | "non_veg" | "egg">("all");
+  const [selectedFilter, setSelectedFilter] = useState<"all" | "veg" | "non_veg" | "egg" | "jain" | "vegan">("all");
   const [previewSelectedItem, setPreviewSelectedItem] = useState<MenuItem | null>(null);
 
   const TemplateComponent = MENU_TEMPLATES[restaurant.template_key] || MENU_TEMPLATES.cafe;
+  const isPureVeg = restaurant.dietary_type === "pure_veg";
+  const isNonVegSpecialty = restaurant.dietary_type === "non_veg";
 
   // Filter items based on search and dietary filter
   const filteredCategories = categories
@@ -26,10 +28,15 @@ export function PhonePreview({ restaurant, categories, items }: PhonePreviewProp
       const catItems = items
         .filter((item) => item.category_id === cat.id && item.is_visible)
         .filter((item) => {
+          // Strictly protect Pure Veg integrity
+          if (isPureVeg && item.food_type === "non_veg") return false;
+
           // Dietary Filter
           if (selectedFilter === "veg" && item.food_type !== "veg") return false;
           if (selectedFilter === "non_veg" && item.food_type !== "non_veg") return false;
           if (selectedFilter === "egg" && item.food_type !== "egg") return false;
+          if (selectedFilter === "jain" && !item.is_jain) return false;
+          if (selectedFilter === "vegan" && !item.is_vegan) return false;
 
           // Search Filter
           if (searchQuery.trim()) {
@@ -47,6 +54,29 @@ export function PhonePreview({ restaurant, categories, items }: PhonePreviewProp
       };
     })
     .filter((cat) => cat.items.length > 0 || !searchQuery.trim());
+
+  const previewChips = isPureVeg
+    ? [
+        { key: "all" as const, label: "All" },
+        { key: "veg" as const, label: "🌱 100% Veg" },
+        { key: "jain" as const, label: "Jain" },
+        { key: "vegan" as const, label: "Vegan" },
+      ]
+    : isNonVegSpecialty
+    ? [
+        { key: "all" as const, label: "All" },
+        { key: "non_veg" as const, label: "🍗 Non-Veg" },
+        { key: "egg" as const, label: "🥚 Egg" },
+        { key: "veg" as const, label: "🌱 Veg" },
+      ]
+    : [
+        { key: "all" as const, label: "All" },
+        { key: "veg" as const, label: "🌱 Veg" },
+        { key: "non_veg" as const, label: "🍗 Non-Veg" },
+        { key: "egg" as const, label: "🥚 Egg" },
+        { key: "jain" as const, label: "Jain" },
+        { key: "vegan" as const, label: "Vegan" },
+      ];
 
   return (
     <div className="flex flex-col items-center">
@@ -81,6 +111,15 @@ export function PhonePreview({ restaurant, categories, items }: PhonePreviewProp
 
           {/* Quick In-Phone Search Bar */}
           <div className="px-3 pt-1 pb-2 border-b border-zinc-100 dark:border-zinc-800 shrink-0 bg-inherit z-10 flex flex-col gap-1.5">
+            {isPureVeg && (
+              <div className="flex items-center justify-between px-0.5 text-[10px]">
+                <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  🌱 100% Pure Veg
+                </span>
+                <span className="text-zinc-400 text-[9px]">Verified Standard</span>
+              </div>
+            )}
             <div className="relative">
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
@@ -94,17 +133,17 @@ export function PhonePreview({ restaurant, categories, items }: PhonePreviewProp
 
             {/* Quick Filter Chips */}
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-              {(["all", "veg", "non_veg", "egg"] as const).map((filter) => (
+              {previewChips.map((chip) => (
                 <button
-                  key={filter}
-                  onClick={() => setSelectedFilter(filter)}
+                  key={chip.key}
+                  onClick={() => setSelectedFilter(chip.key)}
                   className={`px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-all duration-150 active:scale-90 ${
-                    selectedFilter === filter
+                    selectedFilter === chip.key
                       ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-xs"
                       : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
                   }`}
                 >
-                  {filter === "all" ? "All" : filter === "veg" ? "🌱 Veg" : filter === "non_veg" ? "🍗 Non-Veg" : "🥚 Egg"}
+                  {chip.label}
                 </button>
               ))}
             </div>

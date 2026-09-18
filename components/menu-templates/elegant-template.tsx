@@ -2,7 +2,7 @@
 
 import React from "react";
 import { TemplateProps } from "./types";
-import { FoodIndicator, DietaryBadges } from "@/components/ui/food-indicator";
+import { FoodIndicator, DietaryBadges, EstablishmentDietaryBadge } from "@/components/ui/food-indicator";
 import { formatCurrency } from "@/lib/utils";
 import { Phone, MapPin, MessageCircle, Sparkles, ChevronRight, Eye } from "lucide-react";
 
@@ -35,6 +35,9 @@ export function ElegantTemplate({
         <p className="text-[10px] font-sans tracking-[0.3em] text-amber-400/90 uppercase mt-1">
           {restaurant.restaurant_type || "Fine Dining & Lounge"}
         </p>
+        <div className="mt-2.5 flex justify-center">
+          <EstablishmentDietaryBadge dietaryType={restaurant.dietary_type} />
+        </div>
 
         {restaurant.description && (
           <p className="text-xs text-[#9E9B95] max-w-sm mx-auto mt-3 font-sans italic leading-relaxed">

@@ -1,4 +1,5 @@
 export type FoodType = 'veg' | 'non_veg' | 'egg';
+export type RestaurantDietaryType = 'pure_veg' | 'non_veg' | 'both';
 
 export type TemplateKey =
   | 'minimal'
@@ -27,6 +28,7 @@ export interface Restaurant {
   slug: string;
   description: string | null;
   restaurant_type: string;
+  dietary_type?: RestaurantDietaryType;
   logo_url: string | null;
   cover_image_url: string | null;
   phone: string | null;

@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useMenuStore } from "@/lib/store";
-import { FoodType, TemplateKey } from "@/types";
+import { FoodType, RestaurantDietaryType, TemplateKey } from "@/types";
 import { TEMPLATE_METAS } from "@/components/menu-templates";
-import { FoodIndicator } from "@/components/ui/food-indicator";
+import { FoodIndicator, EstablishmentDietaryBadge } from "@/components/ui/food-indicator";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { getAppBaseUrl } from "@/lib/utils";
@@ -39,6 +39,7 @@ export default function OnboardingPage() {
   // Step 1: Restaurant Info (blank by default, using placeholders)
   const [restName, setRestName] = useState("");
   const [restType, setRestType] = useState("Café");
+  const [dietaryType, setDietaryType] = useState<RestaurantDietaryType>("pure_veg");
   const [phone, setPhone] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [address, setAddress] = useState("");
@@ -89,6 +90,7 @@ export default function OnboardingPage() {
       const newRest = await createRestaurant({
         name: restName.trim(),
         restaurant_type: restType,
+        dietary_type: dietaryType,
         phone: phone.trim() || null,
         whatsapp: whatsapp.trim() || null,
         address: address.trim() || null,
@@ -249,6 +251,77 @@ export default function OnboardingPage() {
                   <option value="Food Truck">Food Truck / Cloud Kitchen</option>
                   <option value="Juice Bar">Juice & Smoothie Bar</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Dietary Kitchen Standard (Trust & FSSAI) */}
+            <div className="pt-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  Dietary Kitchen Standard *
+                </label>
+                <span className="text-[10px] text-zinc-400 font-medium">Customer Trust & Badges</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {[
+                  {
+                    type: "pure_veg" as const,
+                    badge: "100% Pure Veg",
+                    icon: "🌱",
+                    title: "Pure Veg",
+                    desc: "Strictly vegetarian. Non-veg & Egg filters are hidden to build customer trust.",
+                  },
+                  {
+                    type: "both" as const,
+                    badge: "Dual Menu",
+                    icon: "🥗🍗",
+                    title: "Veg & Non-Veg (Mix)",
+                    desc: "Serves both vegetarian and non-vegetarian dishes. All filters enabled.",
+                  },
+                  {
+                    type: "non_veg" as const,
+                    badge: "Specialty",
+                    icon: "🍗",
+                    title: "Non-Veg",
+                    desc: "Focused on non-veg cuisine, kebabs, steaks, and grills.",
+                  },
+                ].map((opt) => {
+                  const isSelected = dietaryType === opt.type;
+                  return (
+                    <button
+                      key={opt.type}
+                      type="button"
+                      onClick={() => setDietaryType(opt.type)}
+                      className={`p-3 rounded-2xl border text-left transition-all duration-200 relative flex flex-col justify-between ${
+                        isSelected
+                          ? "border-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/40 ring-2 ring-emerald-500 shadow-xs scale-[1.01]"
+                          : "border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 hover:border-zinc-300 dark:hover:border-zinc-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xl">{opt.icon}</span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            isSelected
+                              ? "bg-emerald-600 text-white"
+                              : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300"
+                          }`}
+                        >
+                          {opt.badge}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center justify-between">
+                          {opt.title}
+                          {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                        </div>
+                        <p className="text-[11px] text-zinc-500 leading-snug mt-1">
+                          {opt.desc}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -469,29 +542,43 @@ export default function OnboardingPage() {
               <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                 Food Classification (FSSAI)
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    { type: "veg", label: "Veg" },
-                    { type: "non_veg", label: "Non-Veg" },
-                    { type: "egg", label: "Egg" },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    type="button"
-                    key={opt.type}
-                    onClick={() => setFoodType(opt.type)}
-                    className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-semibold transition-all ${
-                      foodType === opt.type
-                        ? "border-emerald-600 bg-emerald-50/70 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200 ring-1 ring-emerald-500"
-                        : "border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 text-zinc-700 dark:text-zinc-300"
-                    }`}
-                  >
-                    <FoodIndicator type={opt.type} size="sm" />
-                    <span>{opt.label}</span>
-                  </button>
-                ))}
-              </div>
+              {dietaryType === "pure_veg" ? (
+                <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/80 rounded-2xl flex items-center gap-3">
+                  <FoodIndicator type="veg" size="md" />
+                  <div>
+                    <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                      100% Pure Vegetarian Dish
+                    </p>
+                    <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400">
+                      Registered as Pure Veg. Non-veg and egg options are strictly excluded to preserve customer trust.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      { type: "veg", label: "Veg" },
+                      { type: "non_veg", label: "Non-Veg" },
+                      { type: "egg", label: "Egg" },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      type="button"
+                      key={opt.type}
+                      onClick={() => setFoodType(opt.type)}
+                      className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                        foodType === opt.type
+                          ? "border-emerald-600 bg-emerald-50/70 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200 ring-1 ring-emerald-500"
+                          : "border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 text-zinc-700 dark:text-zinc-300"
+                      }`}
+                    >
+                      <FoodIndicator type={opt.type} size="sm" />
+                      <span>{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="pt-4 flex items-center justify-between">
@@ -519,6 +606,9 @@ export default function OnboardingPage() {
               <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
                 Congratulations! Your digital menu for <strong>{restName}</strong> is now published and accessible to anyone via this QR code.
               </p>
+              <div className="mt-2.5">
+                <EstablishmentDietaryBadge dietaryType={dietaryType} />
+              </div>
             </div>
 
             {/* QR Card Container */}

@@ -10,6 +10,7 @@ export const DEMO_RESTAURANT: Restaurant = {
   slug: "cafe-aroma",
   description: "Artisanal coffee, handcrafted teas, and freshly toasted treats in an ambient setting.",
   restaurant_type: "Café",
+  dietary_type: "both",
   logo_url: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=200&auto=format&fit=crop&q=80",
   cover_image_url: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=1200&auto=format&fit=crop&q=80",
   phone: "+91 98765 43210",

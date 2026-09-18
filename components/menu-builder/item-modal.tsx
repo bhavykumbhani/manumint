@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { FoodIndicator } from "@/components/ui/food-indicator";
+import { useMenuStore } from "@/lib/store";
 
 interface ItemModalProps {
   isOpen: boolean;
@@ -24,6 +25,9 @@ export function ItemModal({
   categories,
   initialCategoryId,
 }: ItemModalProps) {
+  const { restaurant } = useMenuStore();
+  const isPureVeg = restaurant?.dietary_type === "pure_veg";
+
   const [name, setName] = useState("");
   const [price, setPrice] = useState<string>("");
   const [categoryId, setCategoryId] = useState("");
@@ -46,7 +50,7 @@ export function ItemModal({
       setCategoryId(item.category_id);
       setDescription(item.description || "");
       setImageUrl(item.image_url || "");
-      setFoodType(item.food_type);
+      setFoodType(isPureVeg ? "veg" : item.food_type);
       setIsAvailable(item.is_available);
       setIsVisible(item.is_visible);
       setIsBestseller(item.is_bestseller);
@@ -85,6 +89,10 @@ export function ItemModal({
       setError("Please select a category");
       return;
     }
+    if (isPureVeg && foodType !== "veg") {
+      setError("Cannot add non-vegetarian or egg dishes to a 100% Pure Veg restaurant.");
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -95,7 +103,7 @@ export function ItemModal({
         category_id: categoryId,
         description: description.trim() || null,
         image_url: imageUrl.trim() || null,
-        food_type: foodType,
+        food_type: isPureVeg ? "veg" : foodType,
         is_available: isAvailable,
         is_visible: isVisible,
         is_bestseller: isBestseller,
@@ -115,7 +123,7 @@ export function ItemModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={item ? "Edit Menu Item" : "Add Menu Item"}
+      title={item ? "Edit Dish" : "Add New Dish"}
       description="Configure dish name, price in INR (₹), food type, and dietary tags."
       maxWidth="lg"
     >
@@ -172,6 +180,7 @@ export function ItemModal({
           <select
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
+            required
             className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
           >
             {categories.map((c) => (
@@ -187,29 +196,48 @@ export function ItemModal({
           <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
             Food Type (FSSAI Classification)
           </label>
-          <div className="grid grid-cols-3 gap-2">
-            {(
-              [
-                { type: "veg", label: "Vegetarian" },
-                { type: "non_veg", label: "Non-Veg" },
-                { type: "egg", label: "Contains Egg" },
-              ] as const
-            ).map((opt) => (
-              <button
-                type="button"
-                key={opt.type}
-                onClick={() => setFoodType(opt.type)}
-                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-semibold transition-all ${
-                  foodType === opt.type
-                    ? "border-emerald-600 bg-emerald-50/70 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200 ring-1 ring-emerald-500"
-                    : "border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
-                }`}
-              >
-                <FoodIndicator type={opt.type} size="sm" />
-                <span>{opt.label}</span>
-              </button>
-            ))}
-          </div>
+          {isPureVeg ? (
+            <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-2xl flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <FoodIndicator type="veg" size="md" />
+                <div>
+                  <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                    100% Pure Vegetarian Dish
+                  </p>
+                  <p className="text-[11px] text-emerald-700/80 dark:text-emerald-400">
+                    Registered as Pure Veg. Non-veg and egg dishes are strictly restricted.
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] font-black bg-emerald-600 text-white px-2.5 py-0.5 rounded-full shrink-0">
+                Pure Veg
+              </span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { type: "veg", label: "Vegetarian" },
+                  { type: "non_veg", label: "Non-Veg" },
+                  { type: "egg", label: "Contains Egg" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  type="button"
+                  key={opt.type}
+                  onClick={() => setFoodType(opt.type)}
+                  className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                    foodType === opt.type
+                      ? "border-emerald-600 bg-emerald-50/70 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200 ring-1 ring-emerald-500"
+                      : "border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                  }`}
+                >
+                  <FoodIndicator type={opt.type} size="sm" />
+                  <span>{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Description */}

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { TemplateProps } from "./types";
-import { FoodIndicator, DietaryBadges } from "@/components/ui/food-indicator";
+import { FoodIndicator, DietaryBadges, EstablishmentDietaryBadge } from "@/components/ui/food-indicator";
 import { formatCurrency } from "@/lib/utils";
 import { Phone, MapPin, MessageCircle, Crown, Sparkles, ChevronRight } from "lucide-react";
 import { InstagramIcon } from "@/components/ui/icons";
@@ -66,6 +66,7 @@ export function RoyalHeritageTemplate({
             <span className="text-[11px] font-bold text-[#D4AF37] bg-[#D4AF37]/15 px-3 py-0.5 rounded-full border border-[#D4AF37]/30">
               {restaurant.restaurant_type || "Royal Indian Cuisine"}
             </span>
+            <EstablishmentDietaryBadge dietaryType={restaurant.dietary_type} />
           </div>
 
           {restaurant.description && (
